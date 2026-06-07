@@ -1,0 +1,6 @@
+{
+  "name": "Dashboard Wano - Calistenia y Capoeira",
+  "description": "Un panel interactivo inspirado en el Japón feudal y el arco de Wano de One Piece, donde un samurai evoluciona sus capacidades físicas de calistenia y capoeira.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
