@@ -52,12 +52,12 @@ export default function CharacterEvolutionSession({
     .replace(/iniciante/gi, "batizado")
     .replace(/Shogunado/gi, "Dojo del Maestro");
 
+  // This panel always stacks. It used to be `lg:flex-row`, which reads the
+  // VIEWPORT width — but the panel lives inside the 4-of-12 left column, so at
+  // the lg breakpoint it tried to lay out two columns inside ~312px and needed
+  // 527px. That is the overlap seen on an iPad in landscape. The column is
+  // never wide enough for a side-by-side split at any viewport.
   return (
-    {/* This panel always stacks. It used to be `lg:flex-row`, which reads the
-        VIEWPORT width — but the panel lives inside the 4-of-12 left column, so
-        at the lg breakpoint it tried to lay out two columns inside ~312px and
-        needed 527px. That is the overlap seen on an iPad in landscape. The
-        column is never wide enough for a side-by-side split at any viewport. */}
     <div className="flex flex-col gap-6 p-6 wood-panel rounded-xl border border-wano-gold/20 shadow-2xl relative overflow-hidden" id="character-evolution-panel">
 
       {/* Dynamic Background Fog & Crimson light */}
