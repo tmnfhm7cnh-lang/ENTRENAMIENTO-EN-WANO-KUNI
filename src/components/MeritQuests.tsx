@@ -94,7 +94,7 @@ export default function MeritQuests({
                           ? "bg-teal-950 border-teal-800 text-teal-400"
                           : quest.difficulty === "Difícil"
                             ? "bg-amber-950 border-amber-800 text-amber-500"
-                            : "bg-wano-crimson/30 border-wano-crimson text-wano-crimson-light animate-pulse"
+                            : "bg-wano-crimson/30 border-wano-crimson text-wano-crimson-light"
                     }`}>
                       {quest.difficulty}
                     </span>

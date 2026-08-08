@@ -24,7 +24,7 @@ export default function Header({ character }: HeaderProps) {
         {/* Wano Crest & Title */}
         <div className="flex items-center gap-4 text-center md:text-left self-stretch justify-center md:justify-start">
           <div className="relative w-16 h-16 rounded-full border-2 border-wano-gold/40 flex items-center justify-center bg-wano-crimson/20 shadow-[0_0_15px_rgba(158,27,32,0.4)] block shrink-0">
-            <Swords className="w-8 h-8 text-wano-gold animate-[spin_12s_linear_infinite]" />
+            <Swords className="w-8 h-8 text-wano-gold" />
             <span className="absolute -bottom-1 -right-1 text-[10px] px-1 bg-wano-gold text-wano-ink font-mono font-bold rounded">
               Lvl {character.level}
             </span>
@@ -60,8 +60,6 @@ export default function Header({ character }: HeaderProps) {
               className="absolute left-0 top-0 h-full bg-gradient-to-r from-wano-crimson via-wano-crimson-light to-wano-gold transition-all duration-500 rounded-full"
               style={{ width: `${xpPercent}%` }}
             />
-            {/* Shimmer effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent w-full -translate-x-full animate-[shimmer_2s_infinite]" />
           </div>
 
           <p className="text-[10px] text-zinc-400 text-right italic font-mono">

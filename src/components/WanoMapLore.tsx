@@ -82,7 +82,7 @@ export default function WanoMapLore({
   onSelectScenario,
 }: WanoMapLoreProps) {
   return (
-    <div className="w-full flex flex-col gap-6 wood-panel p-6 rounded-xl border border-wano-gold/15 animate-fade-in" id="wano-scenarios-shrine">
+    <div className="w-full flex flex-col gap-6 wood-panel p-6 rounded-xl border border-wano-gold/15" id="wano-scenarios-shrine">
       
       {/* Scroll Header */}
       <div className="border-b border-wano-gold/15 pb-4">
@@ -121,7 +121,7 @@ export default function WanoMapLore({
                   {isUnlocked && (
                     <span className={`text-[8px] font-japanese tracking-wider px-1.5 py-0.2 rounded border ${
                       isActive
-                        ? "bg-wano-crimson border-wano-gold/50 text-wano-gold font-bold animate-pulse"
+                        ? "bg-wano-crimson border-wano-gold/50 text-wano-gold font-bold"
                         : "bg-zinc-800 border-zinc-700 text-zinc-300"
                     }`}>
                       {isActive ? "ACTIVO" : "DISPONIBLE"}

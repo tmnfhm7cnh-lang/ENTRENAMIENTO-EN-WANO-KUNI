@@ -23,12 +23,20 @@ class WanoSynth {
   private masterGain: GainNode | null = null;
 
   init() {
-    if (this.ctx) return;
+    if (this.ctx) {
+      // Safari on iOS suspends the context when the page is backgrounded and
+      // does not resume it on its own. Without this, everything below runs and
+      // schedules notes into a context that is never advancing, which looks
+      // exactly like "the music is broken".
+      if (this.ctx.state === "suspended") void this.ctx.resume();
+      return;
+    }
     this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.setValueAtTime(0.7, this.ctx.currentTime);
     this.masterGain.connect(this.ctx.destination);
     this._buildReverb();
+    if (this.ctx.state === "suspended") void this.ctx.resume();
   }
 
   // Reverb sintético: delay + feedback simula una sala de madera tradicional
@@ -261,17 +269,21 @@ export default function Soundtrack() {
     };
   }, [muted]);
 
+  // These two used to be `disabled={muted}` AND to bail out on `muted`, so on a
+  // fresh load the only two labelled buttons in the panel did nothing at all —
+  // which is what made the whole feature look dead. Now they play on demand and
+  // turn the sound on if it was off.
   const testPluck = () => {
+    if (muted) setMuted(false);
     synthManager.init();
-    if (muted) return;
     const kotoNotes = [220.00, 246.94, 261.63, 329.63, 349.23, 440.00];
     const randomNote = kotoNotes[Math.floor(Math.random() * kotoNotes.length)];
     synthManager.playKoto(randomNote);
   };
 
   const testDrum = () => {
+    if (muted) setMuted(false);
     synthManager.init();
-    if (muted) return;
     synthManager.playTaiko();
   };
 
@@ -290,7 +302,7 @@ export default function Soundtrack() {
       className="p-3 bg-wano-ink/90 border border-wano-gold/30 rounded-lg flex items-center justify-between gap-4 max-w-sm ml-auto z-20 shadow-lg"
     >
       <div className="flex items-center gap-2">
-        <span className="p-1.5 bg-wano-crimson/20 rounded-full border border-wano-crimson/40 text-wano-gold-dark animate-pulse">
+        <span className="p-1.5 bg-wano-crimson/20 rounded-full border border-wano-crimson/40 text-wano-gold-dark">
           <Music className="w-4 h-4" />
         </span>
         <div>
@@ -298,7 +310,7 @@ export default function Soundtrack() {
             INSTRUMENTOS DE WANO
           </h4>
           <p className="text-[10px] text-gray-400 font-mono">
-            {muted ? "Música Ancestral Desactivada" : "Melodía Hirajoshi Sonando..."}
+            {muted ? "Silencio" : "Melodía sonando"}
           </p>
         </div>
       </div>
@@ -306,7 +318,7 @@ export default function Soundtrack() {
       <div className="flex gap-2">
         <button
           id="btn-test-pluck"
-          disabled={muted}
+
           onClick={testPluck}
           className={`px-2 py-1 flex items-center gap-1 text-[10px] font-japanese tracking-wide rounded border transition-colors ${
             muted
@@ -320,7 +332,7 @@ export default function Soundtrack() {
 
         <button
           id="btn-test-drum"
-          disabled={muted}
+
           onClick={testDrum}
           className={`px-2 py-1 flex items-center gap-1 text-[10px] font-japanese tracking-wide rounded border transition-colors ${
             muted

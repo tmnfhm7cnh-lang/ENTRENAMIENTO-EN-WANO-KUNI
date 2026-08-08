@@ -195,7 +195,7 @@ export default function TrainingLogger({ logs, onAddLog }: TrainingLoggerProps) 
 
         {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
-            <Calendar className="w-10 h-10 text-zinc-600 animate-pulse" />
+            <Calendar className="w-10 h-10 text-zinc-600" />
             <p className="font-japanese text-xs text-zinc-400">Su diario está en blanco, samurai.</p>
             <p className="text-[10px] text-zinc-500 font-mono">Consagre su espíritu anotando una sesión arriba o entrenando.</p>
           </div>
@@ -231,7 +231,7 @@ export default function TrainingLogger({ logs, onAddLog }: TrainingLoggerProps) 
 
                   {/* XP Gain marker */}
                   <div className="flex items-center gap-1.5 self-end md:self-center mt-2 md:mt-0 font-japanese text-[10px] bg-wano-crimson/15 border border-wano-gold/30 px-2.5 py-1 rounded text-wano-gold font-bold">
-                    <Sparkles className="w-3 h-3 text-wano-gold animate-spin" />
+                    <Sparkles className="w-3 h-3 text-wano-gold" />
                     +{log.xpGained} XP
                   </div>
                 </div>

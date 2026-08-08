@@ -11,9 +11,24 @@ export interface MuzenzaGraduation {
   title: string;
 }
 
+/**
+ * The order of the cordas is real and validated by Daniel (2026-08-08).
+ *
+ * `levelRange` is NOT: it is a leftover from the original design, where the
+ * game level awarded the corda. That is being removed — the corda is a fact set
+ * by the mestre at the yearly batizado, not something this app can grant. Until
+ * the rework lands, treat these ranges as decorative.
+ */
 export const MUZENZA_CORDAS: MuzenzaGraduation[] = [
   {
-    levelRange: [1, 3],
+    levelRange: [1, 1],
+    cordaName: "Corda Crua",
+    cordaColors: ["#e7e0d3"],
+    rankCategory: "Batizado",
+    title: "Batizado - Corda Crua"
+  },
+  {
+    levelRange: [2, 3],
     cordaName: "Corda Cinza",
     cordaColors: ["#9ca3af"],
     rankCategory: "Batizado",

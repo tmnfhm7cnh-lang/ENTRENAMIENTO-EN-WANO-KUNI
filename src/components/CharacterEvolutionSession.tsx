@@ -17,14 +17,12 @@ interface CharacterEvolutionSessionProps {
   character: SamuraiCharacter;
   availablePoints: number;
   onAllocatePoint: (stat: "strength" | "agility" | "balance" | "rhythm") => void;
-  onEvolutionClick: () => void;
 }
 
 export default function CharacterEvolutionSession({
   character,
   availablePoints,
   onAllocatePoint,
-  onEvolutionClick,
 }: CharacterEvolutionSessionProps) {
   const [showCordaChronology, setShowCordaChronology] = useState(false);
 
@@ -120,7 +118,7 @@ export default function CharacterEvolutionSession({
 
           {/* Stage Badge overlay */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-wano-ink/90 border border-wano-gold/50 px-3 py-1 rounded-full flex items-center justify-center gap-1.5 shadow-md">
-            <span className="w-2 h-2 rounded-full bg-wano-crimson animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-wano-crimson" />
             <span className="text-[10px] font-japanese tracking-widest text-[#dac8ac] font-bold uppercase">
               ETAPA {character.phase}
             </span>
@@ -149,12 +147,12 @@ export default function CharacterEvolutionSession({
           </h3>
           
           {availablePoints > 0 ? (
-            <div className="mt-3 p-2 bg-wano-crimson/20 border border-wano-gold/50 rounded flex items-center justify-between animate-bounce">
+            <div className="mt-3 p-2 bg-wano-crimson/20 border border-wano-gold/50 rounded flex items-center justify-between">
               <span className="text-xs text-wano-parchment font-medium font-japanese tracking-wide flex items-center gap-1">
                 <Sparkles className="w-4 h-4 text-wano-gold" />
                 ¡TIENES {availablePoints} PUNTOS DE ENTRENAMIENTO!
               </span>
-              <span className="text-[10px] bg-wano-gold text-wano-ink px-2 py-0.5 rounded font-mono font-bold uppercase animate-pulse">
+              <span className="text-[10px] bg-wano-gold text-wano-ink px-2 py-0.5 rounded font-mono font-bold uppercase">
                 Asignar abajo
               </span>
             </div>
@@ -319,7 +317,7 @@ export default function CharacterEvolutionSession({
           >
             <span className="flex items-center gap-1.5 uppercase tracking-widest text-[#fca5a5]">
               <Award className="w-4 h-4 text-wano-purple" />
-              🥋 Rango Muzenza ({MUZENZA_CORDAS.length} Cordas)
+              Rango Muzenza ({MUZENZA_CORDAS.length} Cordas)
             </span>
             {showCordaChronology ? <ChevronUp className="w-4 h-4 text-wano-gold" /> : <ChevronDown className="w-4 h-4 text-wano-gold" />}
           </button>
@@ -358,7 +356,7 @@ export default function CharacterEvolutionSession({
                         </div>
                         <div className="flex flex-col">
                           <span className={`text-[11px] font-semibold ${isActive ? "text-wano-gold" : "text-[#eae3ea]"}`}>
-                            {c.title} {isActive && "⭐️ (Actual)"}
+                            {c.title} {isActive && "(actual)"}
                           </span>
                           <span className="text-[9px] text-zinc-400 font-mono">
                             Niveles {c.levelRange[0]} - {c.levelRange[1] === 120 ? "99+" : c.levelRange[1]}
@@ -380,19 +378,15 @@ export default function CharacterEvolutionSession({
           )}
         </div>
 
-        {/* Trigger Evolution Button (visible when condition is met or simulated) */}
+        {/* The "Siguiente Etapa" button used to live here. It called
+            handleForceAdvanceSimulator, which handed out 100 XP and +5 to every
+            stat on each click — a debug shortcut that shipped. Removed: the
+            level has to come from training. */}
         <div className="flex items-center justify-between pt-4 border-t border-wano-gold/10">
           <div className="flex flex-col">
             <span className="text-[9px] text-[#ccc2ac] font-mono">ENERGÍA ESPIRITUAL RESURGENTE</span>
             <span className="text-xs text-wano-parchment font-semibold">{character.stats.mentalEnergy}/100 ALIENTO</span>
           </div>
-          <button
-            id="btn-trigger-evolution"
-            onClick={onEvolutionClick}
-            className="px-4 py-2 bg-gradient-to-r from-wano-crimson to-wano-gold text-wano-ink font-japanese text-xs font-extrabold rounded shadow-lg border border-wano-gold/60 hover:brightness-110 active:scale-95 transition-all uppercase tracking-widest cursor-pointer"
-          >
-            Siguiente Etapa ⚔️
-          </button>
         </div>
 
       </div>

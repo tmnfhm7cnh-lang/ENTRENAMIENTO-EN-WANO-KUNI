@@ -4,12 +4,17 @@
  */
 
 import { PhysicalCapacityType, SkillCategory, TrainingSkill, SamuraiCharacter, MeritQuest, TrainingLogEntry } from "../types";
-import { getMuzenzaGraduation } from "../utils/muzenza";
 
-// Images generated for the App
-export const AVATAR_LEVEL1 = "/src/assets/images/samurai_level1_1779988255099.png";
-export const AVATAR_LEVEL2 = "/src/assets/images/samurai_level2_1779988275843.png";
-export const AVATAR_LEVEL3 = "/src/assets/images/samurai_level3_1779988294153.png";
+// Avatars must be imported, not referenced by path: `/src/assets/...` only
+// resolves under the dev server, so a production build shipped three 404s.
+// Importing makes Vite fingerprint them and emit them into dist/.
+import avatarLevel1 from "../assets/images/samurai_level1_1779988255099.png";
+import avatarLevel2 from "../assets/images/samurai_level2_1779988275843.png";
+import avatarLevel3 from "../assets/images/samurai_level3_1779988294153.png";
+
+export const AVATAR_LEVEL1 = avatarLevel1;
+export const AVATAR_LEVEL2 = avatarLevel2;
+export const AVATAR_LEVEL3 = avatarLevel3;
 
 export const INITIAL_CHARACTER: SamuraiCharacter = {
   name: "Samurai",

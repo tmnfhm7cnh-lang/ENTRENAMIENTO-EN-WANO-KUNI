@@ -47,7 +47,7 @@ export default function SkillsTree({
       <div className="flex flex-wrap items-center justify-between border-b border-wano-gold/15 pb-4 gap-4">
         <div>
           <h3 className="font-japanese text-lg text-wano-parchment tracking-widest uppercase flex items-center gap-1.5">
-            <Sword className="w-5 h-5 text-wano-crimson animate-pulse" />
+            <Sword className="w-5 h-5 text-wano-crimson" />
             PERGAMINOS DE HABILIDADES DE WANO
           </h3>
           <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
@@ -174,7 +174,7 @@ export default function SkillsTree({
                       </>
                     ) : (
                       <>
-                        <Zap className="w-3.5 h-3.5 text-wano-gold" /> Práctica Ancestral (+15 XP)
+                        <Zap className="w-3.5 h-3.5 text-wano-gold" /> Práctica Ancestral
                       </>
                     )}
                     <ChevronRight className="w-3.5 h-3.5 ml-auto" />

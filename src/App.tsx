@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   INITIAL_CHARACTER,
   INITIAL_SKILLS,
@@ -18,31 +18,81 @@ import {
   TrainingSkill,
   TrainingLogEntry,
   MeritQuest,
-  SkillCategory,
   PhysicalCapacityType,
 } from "./types";
 import { getMuzenzaGraduation } from "./utils/muzenza";
+import { loadState, saveState, LoadResult } from "./utils/storage";
 import Header from "./components/Header";
 import SakuraEffect from "./components/SakuraEffect";
 import CharacterEvolutionSession from "./components/CharacterEvolutionSession";
 import SkillsTree from "./components/SkillsTree";
 import TrainingLogger from "./components/TrainingLogger";
 import MeritQuests from "./components/MeritQuests";
-import WanoMapLore, { SCENARIOS, ScenicScenario } from "./components/WanoMapLore";
+import BackupPanel from "./components/BackupPanel";
+import WanoMapLore, { SCENARIOS } from "./components/WanoMapLore";
 import { synthManager } from "./components/Soundtrack";
-import { Sword, MapPin, Feather, Compass, Sparkles, BookOpen, Clock, BadgeCheck } from "lucide-react";
+import { MapPin, Sparkles, BookOpen, Clock } from "lucide-react";
+
+// Read localStorage once, before the first render, so the app never flashes the
+// starting character over saved data.
+const RESTORED: LoadResult = loadState();
 
 export default function App() {
-  const [character, setCharacter] = useState<SamuraiCharacter>(INITIAL_CHARACTER);
-  const [skills, setSkills] = useState<TrainingSkill[]>(INITIAL_SKILLS);
-  const [logs, setLogs] = useState<TrainingLogEntry[]>(INITIAL_LOGS);
-  const [quests, setQuests] = useState<MeritQuest[]>(INITIAL_QUESTS);
-  const [activeScenarioId, setActiveScenarioId] = useState("scen_kuri");
-  
-  const [availablePoints, setAvailablePoints] = useState(0);
+  const restored = RESTORED.status === "ok" ? RESTORED.state : null;
+
+  const [character, setCharacter] = useState<SamuraiCharacter>(restored?.character ?? INITIAL_CHARACTER);
+  const [skills, setSkills] = useState<TrainingSkill[]>(restored?.skills ?? INITIAL_SKILLS);
+  const [logs, setLogs] = useState<TrainingLogEntry[]>(restored?.logs ?? INITIAL_LOGS);
+  const [quests, setQuests] = useState<MeritQuest[]>(restored?.quests ?? INITIAL_QUESTS);
+  const [activeScenarioId, setActiveScenarioId] = useState(restored?.activeScenarioId ?? "scen_kuri");
+
+  const [availablePoints, setAvailablePoints] = useState(restored?.availablePoints ?? 0);
   const [currentTab, setCurrentTab] = useState<"skills" | "logger" | "quests" | "scenarios">("skills");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTimer, setToastTimer] = useState<any>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
+
+  // Every state change is written back. The app is small enough that saving the
+  // whole record on each change costs nothing measurable, and it removes any
+  // chance of a change being lost because we forgot to persist that one path.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      // Nothing has changed yet on mount; skip the redundant write, but do not
+      // skip it when we restored nothing, so a fresh install gets a record.
+      if (restored) return;
+    }
+    const ok = saveState({ character, skills, logs, quests, availablePoints, activeScenarioId });
+    setSaveFailed(!ok);
+  }, [character, skills, logs, quests, availablePoints, activeScenarioId, restored]);
+
+  const handleRestoreBackup = (state: {
+    character: SamuraiCharacter;
+    skills: TrainingSkill[];
+    logs: TrainingLogEntry[];
+    quests: MeritQuest[];
+    availablePoints: number;
+    activeScenarioId: string;
+  }) => {
+    setCharacter(state.character);
+    setSkills(state.skills);
+    setLogs(state.logs);
+    setQuests(state.quests);
+    setAvailablePoints(state.availablePoints);
+    setActiveScenarioId(state.activeScenarioId);
+    triggerToast("Copia restaurada. Tu diario y tu progreso vuelven a estar donde los dejaste.");
+  };
+
+  const handleResetAll = () => {
+    setCharacter(INITIAL_CHARACTER);
+    setSkills(INITIAL_SKILLS);
+    setLogs(INITIAL_LOGS);
+    setQuests(INITIAL_QUESTS);
+    setAvailablePoints(0);
+    setActiveScenarioId("scen_kuri");
+    triggerToast("Diario vaciado. Empiezas de cero.");
+  };
 
   // Trigger automated alerts/toasts
   const triggerToast = (msg: string) => {
@@ -75,7 +125,7 @@ export default function App() {
 
     if (leveledUp) {
       setAvailablePoints((prev) => prev + earnedPoints);
-      triggerToast(`⚔️ ¡Excelente Progreso! Has ascendido al Nivel ${newLevel}. Tienes +${earnedPoints} Puntos de Entrenamiento.`);
+      triggerToast(`Has ascendido al Nivel ${newLevel}. Tienes +${earnedPoints} Puntos de Entrenamiento.`);
       
       // Play a special Level Up tone
       synthManager.playLevelUp();
@@ -147,7 +197,7 @@ export default function App() {
         // Apply attribute additions in stats upon training completion or increments
         const isCompletedNow = nextProgress >= skill.maxProgress && skill.progress < skill.maxProgress;
         if (isCompletedNow) {
-          triggerToast(`📜 ¡Habilidad Dominada! Has completado el pergamino "${skill.name}".`);
+          triggerToast(`Habilidad dominada: has completado el pergamino "${skill.name}".`);
           setCharacter((prevChar) => {
             const extraStats = { ...prevChar.stats };
             Object.entries(skill.rewardStats).forEach(([stat, val]) => {
@@ -235,7 +285,7 @@ export default function App() {
         finalXpReward = Math.floor(finalXpReward * 1.2);
       }
 
-      triggerToast(`📝 ¡Sesión registrada! Atributo de ${freshLog.capacityBoosted.split(" ")[0]} incrementado. +${finalXpReward} XP.`);
+      triggerToast(`Sesión registrada. Atributo de ${freshLog.capacityBoosted.split(" ")[0]} incrementado. +${finalXpReward} XP.`);
       return handleXpGain(finalXpReward, { ...prevChar, stats });
     });
   };
@@ -263,7 +313,7 @@ export default function App() {
   const handleClaimQuest = (questId: string) => {
     const updatedQuests = quests.map((q) => {
       if (q.id === questId) {
-        triggerToast(`🏆 ¡Mérito Consagrado! Reclamado Loot: [${q.rewardItem}] y +${q.rewardXp} XP.`);
+        triggerToast(`Mérito consagrado. Recompensa: [${q.rewardItem}] y +${q.rewardXp} XP.`);
         setCharacter((prevChar) => handleXpGain(q.rewardXp, prevChar));
         return { ...q, completed: true };
       }
@@ -277,23 +327,9 @@ export default function App() {
     setActiveScenarioId(id);
     const scen = SCENARIOS.find((s) => s.id === id);
     if (scen) {
-      triggerToast(`🗺️ Escenario establecido en: ${scen.name}. Se activan bonificaciones para ${scen.discipline}.`);
+      triggerToast(`Escenario establecido en: ${scen.name}. Se activan bonificaciones para ${scen.discipline}.`);
       synthManager.playTaiko();
     }
-  };
-
-  // Manual Trigger to simulate level ups for evaluation/playground tests
-  const handleForceAdvanceSimulator = () => {
-    setCharacter((prev) => {
-      const augmentedStats = {
-        strength: prev.stats.strength + 5,
-        agility: prev.stats.agility + 5,
-        balance: prev.stats.balance + 5,
-        rhythm: prev.stats.rhythm + 5,
-        mentalEnergy: prev.stats.mentalEnergy,
-      };
-      return handleXpGain(100, { ...prev, stats: augmentedStats });
-    });
   };
 
   // Auto-Unlock locked items as levels update
@@ -316,9 +352,19 @@ export default function App() {
       {/* Primary Header Banner */}
       <Header character={character} />
 
+      {/* Warn once if the browser refused to persist. Silence here would mean
+          losing a whole session's log without ever saying so. */}
+      {(saveFailed || RESTORED.status === "unreadable") && (
+        <div className="bg-wano-crimson/20 border-y border-wano-crimson/50 py-2 px-4 text-center text-xs text-wano-parchment relative z-20">
+          {saveFailed
+            ? "No se ha podido guardar en este navegador. Exporta una copia antes de cerrar."
+            : `No se pudo leer lo guardado (${RESTORED.status === "unreadable" ? RESTORED.reason : ""}). Se ha empezado de cero; si tienes una copia, impórtala abajo.`}
+        </div>
+      )}
+
       {/* Floating active scenario banner indicator */}
       <div className="bg-[#110e0e] border-y border-wano-gold/15 py-2.5 px-4 text-center text-xs text-[#dac8ac] flex items-center justify-center gap-3 relative z-10 font-mono">
-        <MapPin className="w-3.5 h-3.5 text-wano-crimson animate-bounce shrink-0" />
+        <MapPin className="w-3.5 h-3.5 text-wano-crimson shrink-0" />
         <span>Escenario de Práctica:</span>
         <span className="font-japanese text-wano-gold font-bold bg-wano-crimson/15 px-2.5 py-0.5 rounded border border-wano-crimson/30">
           {currentScenario.japanese} ({currentScenario.name})
@@ -331,8 +377,8 @@ export default function App() {
 
       {/* Dynamic Floating Toast Feedback Alerts */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 bg-wano-ink border-2 border-wano-gold text-wano-parchment font-japanese text-xs rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.3)] flex items-center gap-3 w-80 max-w-full animate-bounce">
-          <BookOpen className="w-5 h-5 text-wano-gold shrink-0 animate-pulse" />
+        <div className="fixed bottom-6 right-6 z-50 p-4 bg-wano-ink border border-wano-gold/50 text-wano-parchment font-japanese text-xs rounded-xl shadow-lg flex items-center gap-3 w-80 max-w-full">
+          <BookOpen className="w-5 h-5 text-wano-gold shrink-0" />
           <p className="leading-relaxed">{toastMessage}</p>
         </div>
       )}
@@ -346,7 +392,6 @@ export default function App() {
             character={character}
             availablePoints={availablePoints}
             onAllocatePoint={handleAllocatePoint}
-            onEvolutionClick={handleForceAdvanceSimulator}
           />
 
           {/* Core Level Milestones Info Scroller */}
@@ -389,6 +434,12 @@ export default function App() {
 
             </div>
           </div>
+
+          <BackupPanel
+            state={{ character, skills, logs, quests, availablePoints, activeScenarioId }}
+            onRestore={handleRestoreBackup}
+            onReset={handleResetAll}
+          />
         </section>
 
         {/* Right Column (Tab Navigation & Content) - Col Span 8 */}
@@ -406,7 +457,7 @@ export default function App() {
                   : "text-[#ccc2ac] hover:bg-zinc-900"
               }`}
             >
-              Habilidades ⚔️
+              Habilidades
             </button>
 
             <button
@@ -418,7 +469,7 @@ export default function App() {
                   : "text-[#ccc2ac] hover:bg-zinc-900"
               }`}
             >
-              Méritos del Dojo 🏆
+              Méritos del Dojo
             </button>
 
             <button
@@ -430,7 +481,7 @@ export default function App() {
                   : "text-[#ccc2ac] hover:bg-zinc-900"
               }`}
             >
-              Diario Marcial 📝
+              Diario Marcial
             </button>
 
             <button
@@ -442,7 +493,7 @@ export default function App() {
                   : "text-[#ccc2ac] hover:bg-zinc-900"
               }`}
             >
-              Cartografía Wano 🗺️
+              Cartografía Wano
             </button>
 
           </div>
@@ -506,7 +557,7 @@ export default function App() {
 
       {/* Aesthetic Footer watermark */}
       <footer className="w-full text-center py-8 text-[11px] text-zinc-650 mt-12 border-t border-wano-gold/5 font-mono select-none">
-        <p className="text-zinc-500">© 226 Feudal Dojo del Shogun Momonosuke de Wano. Todos los derechos de entrenamiento consagrados.</p>
+        <p className="text-zinc-500">Dojo feudal de Wano · Calistenia y capoeira</p>
         <p className="text-zinc-600 mt-1 uppercase text-[9px] tracking-widest font-japanese text-wano-gold/45">Fuerza · Resiliencia · Ginga · Honor</p>
       </footer>
 
