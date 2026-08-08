@@ -53,13 +53,18 @@ export default function CharacterEvolutionSession({
     .replace(/Shogunado/gi, "Dojo del Maestro");
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 p-6 wood-panel rounded-xl border border-wano-gold/20 shadow-2xl relative overflow-hidden" id="character-evolution-panel">
-      
+    {/* This panel always stacks. It used to be `lg:flex-row`, which reads the
+        VIEWPORT width — but the panel lives inside the 4-of-12 left column, so
+        at the lg breakpoint it tried to lay out two columns inside ~312px and
+        needed 527px. That is the overlap seen on an iPad in landscape. The
+        column is never wide enough for a side-by-side split at any viewport. */}
+    <div className="flex flex-col gap-6 p-6 wood-panel rounded-xl border border-wano-gold/20 shadow-2xl relative overflow-hidden" id="character-evolution-panel">
+
       {/* Dynamic Background Fog & Crimson light */}
       <div className="absolute top-0 right-0 w-80 h-80 bg-wano-crimson/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* Core Avatar Frame with Scenario Background and Momonosuke Colors */}
-      <div className="flex-1 flex flex-col items-center justify-between gap-4 py-4 border-b lg:border-b-0 lg:border-r border-wano-gold/10 lg:pr-6">
+      <div className="flex flex-col items-center justify-between gap-4 py-4 pb-6 border-b border-wano-gold/10">
         
         {/* Canvas / Scene Header */}
         <div className="text-center w-full">
@@ -99,7 +104,9 @@ export default function CharacterEvolutionSession({
         </div>
 
         {/* Visual Canvas containing the Samurai Art */}
-        <div className="w-64 h-64 md:w-72 md:h-72 rounded-full border-4 border-wano-purple/40 bg-wano-ink overflow-hidden shadow-[0_0_20px_rgba(192,132,252,0.15)] relative group cursor-pointer block shrink-0">
+        {/* Sized against the container, not the viewport: a fixed md:w-72 (288px)
+            overflowed the 264px of usable width the left column has on an iPad. */}
+        <div className="w-full max-w-[288px] aspect-square rounded-full border-4 border-wano-purple/40 bg-wano-ink overflow-hidden shadow-[0_0_20px_rgba(192,132,252,0.15)] relative group block shrink-0">
           
           {/* Glowing Aura centered on Momonosuke Pink/Lavender Dragon theme */}
           <div className="absolute inset-0 transition-opacity duration-1000 bg-gradient-to-t from-wano-purple/30 via-transparent to-transparent opacity-100" />
