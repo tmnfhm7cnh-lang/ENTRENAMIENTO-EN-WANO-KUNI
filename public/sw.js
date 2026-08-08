@@ -1,5 +1,5 @@
-/**
- * Service worker — makes the app open without connection.
+﻿/**
+ * Service worker â€” makes the app open without connection.
  *
  * Vite fingerprints its output (index-a1b2c3.js), so a hardcoded precache list
  * would go stale on every build. Instead this caches at runtime: first request
@@ -7,11 +7,11 @@
  * served from the cache and refreshed in the background.
  *
  * BUMP `CACHE` ON EVERY DEPLOY. Without it, phones that already installed the
- * app keep serving the previous version from their cache — the same trap that
+ * app keep serving the previous version from their cache â€” the same trap that
  * bit dryland-test-logger.
  */
 
-const CACHE = "wano-kuni-v2";
+const CACHE = "wano-kuni-v3";
 
 self.addEventListener("install", (event) => {
   // Take over as soon as the new worker is ready instead of waiting for every

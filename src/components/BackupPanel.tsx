@@ -79,14 +79,22 @@ export default function BackupPanel({ state, onRestore, onReset }: BackupPanelPr
         </h4>
         <p className="text-[10px] text-zinc-400 mt-1.5 leading-relaxed font-sans">
           Tu diario vive solo en este teléfono. Si borras los datos del navegador o iOS libera espacio,
-          se pierde. Exporta de vez en cuando y guarda el archivo en OneDrive.
+          se pierde. <strong className="text-wano-parchment">Exportar no guarda solo</strong>: abre la
+          hoja de compartir y tú eliges OneDrive.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <button
           id="btn-export-backup"
-          onClick={() => exportBackup(state)}
+          onClick={async () => {
+            const route = await exportBackup(state);
+            setMessage(
+              route === "share"
+                ? "Copia enviada. Elige OneDrive en la hoja de compartir."
+                : "Copia descargada. Búscala en Archivos > Descargas."
+            );
+          }}
           className="flex-1 min-w-[120px] py-2 px-3 bg-wano-crimson/25 hover:bg-wano-crimson text-wano-parchment border border-wano-crimson/50 hover:border-wano-gold/40 rounded text-xs font-japanese font-bold tracking-wide transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" /> Exportar

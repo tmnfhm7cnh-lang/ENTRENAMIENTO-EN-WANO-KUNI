@@ -120,26 +120,51 @@ export function backupFilename(now: Date): string {
   return `wano-kuni-${iso}.json`;
 }
 
-export function exportBackup(
+export type ExportRoute = "share" | "download";
+
+/**
+ * Hands the backup to the OS.
+ *
+ * On iOS the share sheet is the only route that lets the user drop the file
+ * straight into OneDrive; a plain <a download> lands it in Files > Downloads
+ * and they have to go move it by hand. So: share sheet when the browser
+ * supports it for files, download link everywhere else. Same approach as
+ * dryland-test-logger.
+ *
+ * Returns which route was taken so the UI can tell the user where to look.
+ */
+export async function exportBackup(
   state: Omit<PersistedState, "schemaVersion" | "savedAt">,
   now: Date = new Date()
-): void {
+): Promise<ExportRoute> {
   const record: PersistedState = {
     ...state,
     schemaVersion: SCHEMA_VERSION,
     savedAt: now.toISOString(),
   };
-  const blob = new Blob([JSON.stringify(record, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
+  const text = JSON.stringify(record, null, 2);
+  const name = backupFilename(now);
+  const file = new File([text], name, { type: "application/json" });
+
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: name });
+      return "share";
+    } catch {
+      // The user dismissed the sheet, or the browser refused. Fall through to
+      // the download so the export is never a dead end.
+    }
+  }
+
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = backupFilename(now);
+  link.download = name;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+  return "download";
 }
 
 export async function importBackup(file: File): Promise<LoadResult> {
