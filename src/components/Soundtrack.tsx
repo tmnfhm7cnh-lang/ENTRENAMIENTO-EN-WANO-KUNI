@@ -4,251 +4,338 @@
  */
 
 import { useState, useEffect } from "react";
-import { Volume2, VolumeX, Music, Bell } from "lucide-react";
+import { Volume2, VolumeX, Music } from "lucide-react";
+import { BEAT_SEC, eventsInWindow, SCALE_HZ, type Voice } from "../audio/score";
 
 /**
- * WanoSynth — Sintetizador de música tradicional japonesa mejorado.
+ * WanoSynth — the instruments and the clock. The composition lives in ../audio/score.ts.
  *
- * Mejoras respecto a la versión anterior:
- * 1. Koto con ruido de ataque (pluck físico real de la cuerda)
- * 2. Inharmonicidad artificial — parciales ligeramente desafinados como una cuerda real
- * 3. Reverb convolution simulado con delay + feedback para espacio de sala
- * 4. Taiko con cuerpo de membrana (ruido bandpass) + golpe tonal
- * 5. Escala Hirajoshi auténtica (Do, Re, Mi♭, Sol, La♭) en lugar de Insen
- * 6. Fraseo musical con pausas y grupos de notas, no notas aleatorias sueltas
+ * Everything here is synthesised: no audio files, so nothing to license and nothing to download.
+ * That is a real constraint, not a preference — this repository is public, so shipping a recording
+ * would be publishing it. If Daniel picks a track with a licence that allows it, swapping this for
+ * an <audio> loop is a smaller job than this file; see the README.
+ *
+ * Two structural fixes over the previous version, both audible:
+ *
+ * 1. There is a pulse. Notes are placed on a beat grid at a fixed tempo instead of being spaced by
+ *    randomised setTimeout gaps.
+ * 2. Notes are scheduled against `ctx.currentTime`, ahead of when they sound, so timing does not
+ *    depend on a JS timer firing punctually. A 25 ms timer that slips — which on a phone it does,
+ *    constantly — no longer turns into a note arriving late.
  */
+
+const LOOKAHEAD_SEC = 0.35; // how far ahead notes are handed to the audio clock
+const TICK_MS = 60; // how often the scheduler wakes up to top it up
+
 class WanoSynth {
   private ctx: AudioContext | null = null;
-  private reverbNode: ConvolverNode | null = null;
-  private masterGain: GainNode | null = null;
+  private reverb: ConvolverNode | null = null;
+  private dry: GainNode | null = null;
+  private master: GainNode | null = null;
 
   init() {
     if (this.ctx) {
-      // Safari on iOS suspends the context when the page is backgrounded and
-      // does not resume it on its own. Without this, everything below runs and
-      // schedules notes into a context that is never advancing, which looks
-      // exactly like "the music is broken".
+      // Safari suspends the context when the page is backgrounded and does not resume it on its
+      // own. Without this, everything below schedules into a clock that is not advancing, which
+      // looks exactly like "the music is broken".
       if (this.ctx.state === "suspended") void this.ctx.resume();
       return;
     }
-    this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.setValueAtTime(0.7, this.ctx.currentTime);
-    this.masterGain.connect(this.ctx.destination);
-    this._buildReverb();
+    const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+    this.ctx = new Ctor();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0.55;
+    this.master.connect(this.ctx.destination);
+    this.dry = this.ctx.createGain();
+    this.dry.gain.value = 1;
+    this.dry.connect(this.master);
+    this.buildReverb();
     if (this.ctx.state === "suspended") void this.ctx.resume();
   }
 
-  // Reverb sintético: delay + feedback simula una sala de madera tradicional
-  private _buildReverb() {
-    if (!this.ctx || !this.masterGain) return;
-    const ctx = this.ctx;
-    const bufferSize = ctx.sampleRate * 1.8; // 1.8s de cola de reverb
-    const buffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
+  /** A wooden hall, faked with a decaying-noise impulse response. */
+  private buildReverb() {
+    const ctx = this.ctx!;
+    const len = Math.floor(ctx.sampleRate * 1.9);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
-      const data = buffer.getChannelData(ch);
-      for (let i = 0; i < bufferSize; i++) {
-        // Decaimiento exponencial con ruido — simula reflexiones de madera
-        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2.5);
-      }
+      const data = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
     }
-    this.reverbNode = ctx.createConvolver();
-    this.reverbNode.buffer = buffer;
-    // El reverb tiene su propio gain bajo para que no tape la melodía
-    const reverbGain = ctx.createGain();
-    reverbGain.gain.setValueAtTime(0.18, ctx.currentTime);
-    this.reverbNode.connect(reverbGain);
-    reverbGain.connect(this.masterGain);
+    this.reverb = ctx.createConvolver();
+    this.reverb.buffer = buf;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.22;
+    this.reverb.connect(wet);
+    wet.connect(this.master!);
   }
 
-  private _getOutput(): AudioNode {
-    return this.masterGain!;
+  private noiseBurst(dur: number): AudioBufferSourceNode {
+    const ctx = this.ctx!;
+    const buf = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * dur)), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    return src;
   }
 
-  // Pluck de koto con ataque físico y parciales inarmónicos
-  playKoto(freq: number, time?: number) {
-    if (!this.ctx || !this.masterGain) return;
-    const ctx = this.ctx;
-    const t = time ?? ctx.currentTime;
+  private send(node: AudioNode, wetAmount: number) {
+    node.connect(this.dry!);
+    if (this.reverb && wetAmount > 0) {
+      const tap = this.ctx!.createGain();
+      tap.gain.value = wetAmount;
+      node.connect(tap);
+      tap.connect(this.reverb);
+    }
+  }
 
-    // --- Cuerda principal ---
+  /**
+   * Shamisen. What separates it from the koto is the attack: a hard, buzzing snap — the sawari —
+   * and a much faster decay. Built as a detuned saw pair through a lowpass, plus a filtered noise
+   * click on top of the onset.
+   */
+  playShamisen(freq: number, t: number, dur = 0.5, gain = 0.7) {
+    const ctx = this.ctx!;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.22 * gain, t + 0.004);
+    env.gain.exponentialRampToValueAtTime(0.06 * gain, t + Math.min(0.09, dur * 0.3));
+    env.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(freq * 7, t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(300, freq * 2.2), t + dur);
+    lp.Q.value = 0.9;
+
+    for (const detune of [0, 8]) {
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.value = freq;
+      osc.detune.value = detune;
+      osc.connect(lp);
+      osc.start(t);
+      osc.stop(t + dur + 0.05);
+    }
+    lp.connect(env);
+
+    const click = this.noiseBurst(0.03);
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = freq * 4;
+    bp.Q.value = 1.1;
+    const clickGain = ctx.createGain();
+    clickGain.gain.setValueAtTime(0.1 * gain, t);
+    clickGain.gain.exponentialRampToValueAtTime(0.0005, t + 0.035);
+    click.connect(bp);
+    bp.connect(clickGain);
+    click.start(t);
+    click.stop(t + 0.04);
+
+    this.send(env, 0.5);
+    this.send(clickGain, 0.2);
+  }
+
+  /** Koto: a cleaner pluck than the shamisen, with a long tail and a slightly sharp partial. */
+  playKoto(freq: number, t?: number, dur = 1.2, gain = 0.8) {
+    this.init();
+    const ctx = this.ctx!;
+    t = t ?? ctx.currentTime;
+
     const osc = ctx.createOscillator();
-    const envGain = ctx.createGain();
+    const env = ctx.createGain();
     osc.type = "triangle";
     osc.frequency.setValueAtTime(freq, t);
-    // Ligero pitch bend descendente al inicio — cuerda que cede bajo tensión
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.985, t + 0.06);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.72, t + 1.1);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.988, t + 0.07);
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.26 * gain, t + 0.008);
+    env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(env);
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
 
-    envGain.gain.setValueAtTime(0, t);
-    envGain.gain.linearRampToValueAtTime(0.28, t + 0.008); // ataque muy rápido
-    envGain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
-
-    // --- Parcial inarmónico (ligeramente desafinado +7 cents) ---
     const partial = ctx.createOscillator();
-    const partialGain = ctx.createGain();
+    const pg = ctx.createGain();
     partial.type = "sine";
-    partial.frequency.setValueAtTime(freq * 2.007, t); // 2x + inharmonicidad
-    partialGain.gain.setValueAtTime(0, t);
-    partialGain.gain.linearRampToValueAtTime(0.09, t + 0.005);
-    partialGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    partial.frequency.value = freq * 2.007; // inharmonic, like a real string
+    pg.gain.setValueAtTime(0, t);
+    pg.gain.linearRampToValueAtTime(0.08 * gain, t + 0.005);
+    pg.gain.exponentialRampToValueAtTime(0.001, t + Math.min(0.4, dur));
+    partial.connect(pg);
+    partial.start(t);
+    partial.stop(t + Math.min(0.45, dur) + 0.05);
 
-    // --- Ruido de ataque (pick/pluck) ---
-    const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
-    const noiseData = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuffer;
-    const noiseFilter = ctx.createBiquadFilter();
-    noiseFilter.type = "bandpass";
-    noiseFilter.frequency.setValueAtTime(freq * 3, t);
-    noiseFilter.Q.setValueAtTime(1.5, t);
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.12, t);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    const pluck = this.noiseBurst(0.04);
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = freq * 3;
+    bp.Q.value = 1.5;
+    const pluckGain = ctx.createGain();
+    pluckGain.gain.setValueAtTime(0.1 * gain, t);
+    pluckGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    pluck.connect(bp);
+    bp.connect(pluckGain);
+    pluck.start(t);
+    pluck.stop(t + 0.05);
 
-    // Conexiones
-    osc.connect(envGain); envGain.connect(this._getOutput());
-    partial.connect(partialGain); partialGain.connect(this._getOutput());
-    noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(this._getOutput());
-
-    // Mandar también al reverb
-    if (this.reverbNode) {
-      envGain.connect(this.reverbNode);
-      partialGain.connect(this.reverbNode);
-    }
-
-    osc.start(t); osc.stop(t + 1.3);
-    partial.start(t); partial.stop(t + 0.4);
-    noise.start(t); noise.stop(t + 0.05);
+    this.send(env, 0.6);
+    this.send(pg, 0.6);
+    this.send(pluckGain, 0.2);
   }
 
-  // Taiko mejorado: cuerpo de membrana + golpe tonal
-  playTaiko(time?: number) {
-    if (!this.ctx || !this.masterGain) return;
-    const ctx = this.ctx;
-    const t = time ?? ctx.currentTime;
+  /** Shakuhachi-ish: a breathy sustained tone. Mostly filtered noise over a weak sine. */
+  playFlute(freq: number, t: number, dur = 2.5, gain = 0.45) {
+    const ctx = this.ctx!;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.1 * gain, t + 0.28); // slow, breathy onset
+    env.gain.setValueAtTime(0.1 * gain, t + dur * 0.65);
+    env.gain.exponentialRampToValueAtTime(0.0008, t + dur);
 
-    // Golpe tonal (cuerpo bajo del tambor)
-    const toneOsc = ctx.createOscillator();
-    const toneGain = ctx.createGain();
-    toneOsc.type = "sine";
-    toneOsc.frequency.setValueAtTime(68, t);
-    toneOsc.frequency.exponentialRampToValueAtTime(28, t + 0.4);
-    toneGain.gain.setValueAtTime(0.55, t);
-    toneGain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, t);
+    // A little unsteadiness in the pitch, or it sounds like a test tone.
+    osc.frequency.linearRampToValueAtTime(freq * 1.006, t + dur * 0.4);
+    osc.frequency.linearRampToValueAtTime(freq * 0.997, t + dur);
+    osc.connect(env);
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
 
-    // Membrana (ruido filtrado bajo)
-    const membBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.18, ctx.sampleRate);
-    const membData = membBuffer.getChannelData(0);
-    for (let i = 0; i < membData.length; i++) membData[i] = Math.random() * 2 - 1;
-    const memb = ctx.createBufferSource();
-    memb.buffer = membBuffer;
-    const membFilter = ctx.createBiquadFilter();
-    membFilter.type = "lowpass";
-    membFilter.frequency.setValueAtTime(160, t);
-    const membGain = ctx.createGain();
-    membGain.gain.setValueAtTime(0.35, t);
-    membGain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    const breath = this.noiseBurst(dur + 0.1);
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = freq * 1.6;
+    bp.Q.value = 2.2;
+    const bg = ctx.createGain();
+    bg.gain.setValueAtTime(0, t);
+    bg.gain.linearRampToValueAtTime(0.05 * gain, t + 0.3);
+    bg.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+    breath.connect(bp);
+    bp.connect(bg);
+    breath.start(t);
+    breath.stop(t + dur + 0.1);
 
-    toneOsc.connect(toneGain); toneGain.connect(this._getOutput());
-    memb.connect(membFilter); membFilter.connect(membGain); membGain.connect(this._getOutput());
+    this.send(env, 0.7);
+    this.send(bg, 0.5);
+  }
 
-    toneOsc.start(t); toneOsc.stop(t + 0.55);
-    memb.start(t); memb.stop(t + 0.2);
+  /** Taiko: low body plus a filtered membrane thud. */
+  playTaiko(t?: number, gain = 1) {
+    this.init();
+    const ctx = this.ctx!;
+    t = t ?? ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(72, t);
+    osc.frequency.exponentialRampToValueAtTime(28, t + 0.4);
+    env.gain.setValueAtTime(0.5 * gain, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(env);
+    osc.start(t);
+    osc.stop(t + 0.55);
+
+    const memb = this.noiseBurst(0.18);
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 170;
+    const mg = ctx.createGain();
+    mg.gain.setValueAtTime(0.3 * gain, t);
+    mg.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    memb.connect(lp);
+    lp.connect(mg);
+    memb.start(t);
+    memb.stop(t + 0.2);
+
+    this.send(env, 0.35);
+    this.send(mg, 0.25);
+  }
+
+  /** Tsuzumi: the small hand drum. Short, high, dry — it marks time where the taiko marks weight. */
+  playTsuzumi(t: number, gain = 0.7) {
+    const ctx = this.ctx!;
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(420, t);
+    osc.frequency.exponentialRampToValueAtTime(190, t + 0.09);
+    env.gain.setValueAtTime(0.16 * gain, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    osc.connect(env);
+    osc.start(t);
+    osc.stop(t + 0.15);
+
+    const skin = this.noiseBurst(0.05);
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 1500;
+    bp.Q.value = 1.4;
+    const sg = ctx.createGain();
+    sg.gain.setValueAtTime(0.11 * gain, t);
+    sg.gain.exponentialRampToValueAtTime(0.0006, t + 0.05);
+    skin.connect(bp);
+    bp.connect(sg);
+    skin.start(t);
+    skin.stop(t + 0.06);
+
+    this.send(env, 0.3);
+    this.send(sg, 0.2);
   }
 
   playLevelUp() {
-    if (!this.ctx || !this.masterGain) return;
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-    // Escala Hirajoshi ascendente: Do, Re, Mi♭, Sol, La♭
-    const notes = [261.63, 293.66, 311.13, 392.00, 415.30, 523.25];
-    notes.forEach((freq, idx) => {
-      this.playKoto(freq, now + idx * 0.16);
-    });
+    this.init();
+    const t0 = this.ctx!.currentTime;
+    [0, 1, 2, 3, 5, 7].forEach((deg, i) => this.playKoto(SCALE_HZ[deg], t0 + i * 0.15));
+    this.playTaiko(t0);
   }
 
-  private melodyTimeout: any = null;
-  private isMelodyPlaying = false;
+  private voice(v: Voice, freq: number, t: number, dur: number, gain: number) {
+    if (v === "shamisen") this.playShamisen(freq, t, dur, gain);
+    else if (v === "koto") this.playKoto(freq, t, dur, gain);
+    else if (v === "flute") this.playFlute(freq, t, dur, gain);
+    else if (v === "taiko") this.playTaiko(t, gain);
+    else this.playTsuzumi(t, gain);
+  }
+
+  private timer: any = null;
+  private playing = false;
+  private startTime = 0;
+  /** Beats already handed to the audio clock. The scheduler never looks back. */
+  private scheduledTo = 0;
 
   startMelody(muted: boolean) {
-    if (this.isMelodyPlaying || muted) return;
-    this.isMelodyPlaying = true;
+    if (this.playing || muted) return;
+    this.init();
+    this.playing = true;
+    // A beat of headroom so the first downbeat is not late on a cold context.
+    this.startTime = this.ctx!.currentTime + 0.15;
+    this.scheduledTo = 0;
 
-    /**
-     * Escala Hirajoshi auténtica (en La): A, B, C, E, F
-     * Sonido claramente japonés, melancólico y limpio.
-     * Las notas se agrupan en frases de 3-5 notas con pausas entre frases,
-     * imitando la forma de tocar el koto tradicional.
-     */
-    const hirajoshi = [
-      220.00,  // A3
-      246.94,  // B3
-      261.63,  // C4
-      329.63,  // E4
-      349.23,  // F4
-      440.00,  // A4
-      493.88,  // B4
-      523.25,  // C5
-      659.25,  // E5
-    ];
-
-    // Frases predefinidas: índices en la escala que forman motivos musicales coherentes
-    const phrases = [
-      [4, 3, 1, 0],           // descendente lento — apertura
-      [0, 1, 3, 4, 3],        // ascenso y vuelta
-      [5, 4, 3, 1],           // frase media
-      [3, 4, 5, 8, 5],        // ascenso al agudo
-      [8, 5, 4, 3, 1, 0],     // cascada descendente
-      [0, 3, 1, 0],           // cierre mínimo
-    ];
-
-    let phraseIndex = 0;
-    let noteIndex = 0;
-    let pauseAfterPhrase = false;
-
-    const playNext = () => {
-      if (!this.isMelodyPlaying) return;
-      this.init();
-
-      if (pauseAfterPhrase) {
-        pauseAfterPhrase = false;
-        // Pausa entre frases: 1.2s - 2.5s (respiración musical)
-        const pause = 1200 + Math.random() * 1300;
-        this.melodyTimeout = setTimeout(playNext, pause);
-        return;
+    const tick = () => {
+      if (!this.playing || !this.ctx) return;
+      const ahead = (this.ctx.currentTime - this.startTime + LOOKAHEAD_SEC) / BEAT_SEC;
+      if (ahead > this.scheduledTo) {
+        for (const e of eventsInWindow(this.scheduledTo, ahead)) {
+          const t = this.startTime + e.absBeat * BEAT_SEC;
+          if (t < this.ctx.currentTime) continue; // context was suspended; let it go rather than pile up
+          const freq = e.degree === undefined ? 0 : SCALE_HZ[e.degree];
+          this.voice(e.voice, freq, t, e.dur ?? 0.9, e.gain ?? 0.7);
+        }
+        this.scheduledTo = ahead;
       }
-
-      const currentPhrase = phrases[phraseIndex % phrases.length];
-      const noteIdx = currentPhrase[noteIndex];
-      const freq = hirajoshi[noteIdx];
-      this.playKoto(freq);
-
-      noteIndex++;
-      if (noteIndex >= currentPhrase.length) {
-        noteIndex = 0;
-        phraseIndex++;
-        pauseAfterPhrase = true;
-        // Nota final de frase suena más larga
-        this.melodyTimeout = setTimeout(playNext, 900 + Math.random() * 400);
-      } else {
-        // Timing interno de frase: notas más rápidas o lentas según posición
-        const noteDurations = [550, 400, 700, 350, 600];
-        const dur = noteDurations[noteIndex % noteDurations.length] + Math.random() * 150;
-        this.melodyTimeout = setTimeout(playNext, dur);
-      }
+      this.timer = setTimeout(tick, TICK_MS);
     };
-
-    // Pequeño delay inicial para que el audio context se estabilice
-    this.melodyTimeout = setTimeout(playNext, 600);
+    tick();
   }
 
   stopMelody() {
-    this.isMelodyPlaying = false;
-    if (this.melodyTimeout) {
-      clearTimeout(this.melodyTimeout);
-      this.melodyTimeout = null;
+    this.playing = false;
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
     }
   }
 }
@@ -259,41 +346,15 @@ export default function Soundtrack() {
   const [muted, setMuted] = useState(true);
 
   useEffect(() => {
-    if (!muted) {
-      synthManager.startMelody(false);
-    } else {
-      synthManager.stopMelody();
-    }
-    return () => {
-      synthManager.stopMelody();
-    };
+    if (!muted) synthManager.startMelody(false);
+    else synthManager.stopMelody();
+    return () => synthManager.stopMelody();
   }, [muted]);
 
-  // These two used to be `disabled={muted}` AND to bail out on `muted`, so on a
-  // fresh load the only two labelled buttons in the panel did nothing at all —
-  // which is what made the whole feature look dead. Now they play on demand and
-  // turn the sound on if it was off.
-  const testPluck = () => {
-    if (muted) setMuted(false);
-    synthManager.init();
-    const kotoNotes = [220.00, 246.94, 261.63, 329.63, 349.23, 440.00];
-    const randomNote = kotoNotes[Math.floor(Math.random() * kotoNotes.length)];
-    synthManager.playKoto(randomNote);
-  };
-
-  const testDrum = () => {
-    if (muted) setMuted(false);
-    synthManager.init();
-    synthManager.playTaiko();
-  };
-
-  const toggleMute = () => {
-    const nextMuted = !muted;
-    setMuted(nextMuted);
-    if (!nextMuted) {
-      synthManager.init();
-      setTimeout(() => synthManager.playKoto(329.63), 200);
-    }
+  const toggle = () => {
+    const next = !muted;
+    setMuted(next);
+    if (!next) synthManager.init();
   };
 
   return (
@@ -307,56 +368,24 @@ export default function Soundtrack() {
         </span>
         <div>
           <h4 className="font-japanese text-xs tracking-wider text-wano-parchment font-semibold">
-            INSTRUMENTOS DE WANO
+            MÚSICA
           </h4>
-          <p className="text-[10px] text-gray-400 font-mono">
-            {muted ? "Silencio" : "Melodía sonando"}
-          </p>
+          <p className="text-[10px] text-gray-400 font-mono">{muted ? "Silencio" : "Sonando"}</p>
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <button
-          id="btn-test-pluck"
-
-          onClick={testPluck}
-          className={`px-2 py-1 flex items-center gap-1 text-[10px] font-japanese tracking-wide rounded border transition-colors ${
-            muted
-              ? "bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed"
-              : "bg-wano-crimson/20 text-wano-gold border-wano-gold/40 hover:bg-wano-crimson/40"
-          }`}
-          title="Tocar Koto de Sakura"
-        >
-          <Bell className="w-3 h-3" /> Koto
-        </button>
-
-        <button
-          id="btn-test-drum"
-
-          onClick={testDrum}
-          className={`px-2 py-1 flex items-center gap-1 text-[10px] font-japanese tracking-wide rounded border transition-colors ${
-            muted
-              ? "bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed"
-              : "bg-wano-crimson/20 text-wano-gold border-wano-gold/40 hover:bg-wano-crimson/40"
-          }`}
-          title="Tocar Tambor Taiko"
-        >
-          Tambor
-        </button>
-
-        <button
-          id="btn-toggle-sound"
-          onClick={toggleMute}
-          className={`p-2 rounded-full transition-colors border ${
-            muted
-              ? "bg-gray-800 text-gray-400 border-gray-600 hover:bg-gray-700"
-              : "bg-wano-crimson text-wano-parchment border-wano-gold/50 hover:bg-wano-crimson-light"
-          }`}
-          title={muted ? "Activar Sonido" : "Silenciar"}
-        >
-          {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-        </button>
-      </div>
+      <button
+        id="btn-toggle-sound"
+        onClick={toggle}
+        className={`p-2 rounded-full transition-colors border ${
+          muted
+            ? "bg-gray-800 text-gray-400 border-gray-600 hover:bg-gray-700"
+            : "bg-wano-crimson text-wano-parchment border-wano-gold/50 hover:bg-wano-crimson-light"
+        }`}
+        title={muted ? "Activar sonido" : "Silenciar"}
+      >
+        {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+      </button>
     </div>
   );
 }

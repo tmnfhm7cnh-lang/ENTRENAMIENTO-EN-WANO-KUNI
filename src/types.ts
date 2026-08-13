@@ -19,8 +19,15 @@ export enum SkillCategory {
 
 export interface TrainingSkill {
   id: string;
+  /**
+   * The real name of the movement, and nothing else. A skill is an exercise Daniel actually
+   * trains, so it is called what a coach calls it: "Front lever", not "Enma's Horizontal
+   * Suspension". The Wano skin lives in the quests, the ranks and the lore — not on top of the
+   * training data, which has to stay comparable with frentes/mi-entrenamiento/registro/.
+   */
   name: string;
-  japaneseName: string; // Dojo style
+  /** Optional flavour, kept only where invention is harmless. Absent on real movements. */
+  japaneseName?: string;
   category: SkillCategory;
   capacityType: PhysicalCapacityType;
   levelRequired: number;

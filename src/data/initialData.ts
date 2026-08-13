@@ -20,7 +20,7 @@ export const INITIAL_CHARACTER: SamuraiCharacter = {
   name: "Samurai",
   title: "Batizado - Corda Cinza",
   level: 1,
-  xp: 40,
+  xp: 0, // was 40 — invented progress, same defect as the demo logs below
   xpNeeded: 120,
   avatarUrl: AVATAR_LEVEL1,
   phase: 1,
@@ -42,34 +42,31 @@ export const INITIAL_SKILLS: TrainingSkill[] = [
   // CALISTHENICS PATH
   {
     id: "calis_pushups",
-    name: "Flexiones de Madera de Wano",
-    japaneseName: "木製腕立て伏せ (Wanokuni Pushups)",
+    name: "Flexiones",
     category: SkillCategory.Calisthenics,
     capacityType: PhysicalCapacityType.Strength,
     levelRequired: 1,
     unlocked: true,
-    progress: 40,
+    progress: 0,
     maxProgress: 100,
     description: "La base de toda fuerza de empuje. Fortalece el pecho y los brazos para sostener la postura samurai.",
     rewardStats: { strength: 4 }
   },
   {
     id: "calis_pullups",
-    name: "Dominada en Viga del Templo",
-    japaneseName: "寺院の懸垂 (Pull-up of the Temple Beam)",
+    name: "Dominadas",
     category: SkillCategory.Calisthenics,
     capacityType: PhysicalCapacityType.Strength,
     levelRequired: 1,
     unlocked: true,
-    progress: 25,
+    progress: 0,
     maxProgress: 100,
     description: "Sostenerse en las alturas y jalar con fuerza letal. Esencial para la tracción samurai y agarre de espada.",
     rewardStats: { strength: 6 }
   },
   {
     id: "calis_lsit",
-    name: "Escuadra de Hierro de Oden",
-    japaneseName: "おでんの鉄の字 (Oden's L-Sit)",
+    name: "L-sit",
     category: SkillCategory.Calisthenics,
     capacityType: PhysicalCapacityType.Balance,
     levelRequired: 2,
@@ -81,8 +78,7 @@ export const INITIAL_SKILLS: TrainingSkill[] = [
   },
   {
     id: "calis_handstand",
-    name: "Parada de Manos del Monte Fuji",
-    japaneseName: "富士山の逆立ち (Mount Fuji Handstand)",
+    name: "Pino",
     category: SkillCategory.Calisthenics,
     capacityType: PhysicalCapacityType.Balance,
     levelRequired: 3,
@@ -94,8 +90,7 @@ export const INITIAL_SKILLS: TrainingSkill[] = [
   },
   {
     id: "calis_frontlever",
-    name: "Suspensión Horizontal de Enma",
-    japaneseName: "閻魔の水平ぶら下がり (Enma's Front Lever)",
+    name: "Front lever",
     category: SkillCategory.Calisthenics,
     capacityType: PhysicalCapacityType.Strength,
     levelRequired: 4,
@@ -107,8 +102,7 @@ export const INITIAL_SKILLS: TrainingSkill[] = [
   },
   {
     id: "calis_planche",
-    name: "Plancha de Vuelo del Dragón Kaido",
-    japaneseName: "カイドウの龍プランシェ (Kaido's Dragon Planche)",
+    name: "Planche",
     category: SkillCategory.Calisthenics,
     capacityType: PhysicalCapacityType.Strength,
     levelRequired: 5,
@@ -122,34 +116,31 @@ export const INITIAL_SKILLS: TrainingSkill[] = [
   // CAPOEIRA PATH
   {
     id: "capo_ginga",
-    name: "Paso de Flujo Ginga-Katana",
-    japaneseName: "流るるジンガの型 (Ginga Katana Rhythm)",
+    name: "Ginga",
     category: SkillCategory.Capoeira,
     capacityType: PhysicalCapacityType.Rhythm,
     levelRequired: 1,
     unlocked: true,
-    progress: 50,
+    progress: 0,
     maxProgress: 100,
     description: "El flujo constante que imita las olas de Kuri. El movimiento pendular básico de la capoeira cruzado con balance samurai.",
     rewardStats: { rhythm: 5, agility: 3 }
   },
   {
     id: "capo_esquiva",
-    name: "Evasión de Caña del Cañaveral",
-    japaneseName: "竹林の回避 (Bamboo Forest Esquiva)",
+    name: "Esquiva",
     category: SkillCategory.Capoeira,
     capacityType: PhysicalCapacityType.Agility,
     levelRequired: 1,
     unlocked: true,
-    progress: 30,
+    progress: 0,
     maxProgress: 100,
     description: "Agacharse doblando el torso de lado como el bambú ante el viento, esquivando un ataque directo.",
     rewardStats: { agility: 5, rhythm: 2 }
   },
   {
     id: "capo_meialua",
-    name: "Luna Creciente de Kuri",
-    japaneseName: "九里の半月蹴り (Kuri's Meia Lua de Compasso)",
+    name: "Meia lua de compasso",
     category: SkillCategory.Capoeira,
     capacityType: PhysicalCapacityType.Agility,
     levelRequired: 2,
@@ -161,8 +152,7 @@ export const INITIAL_SKILLS: TrainingSkill[] = [
   },
   {
     id: "capo_au",
-    name: "Vuelta de Rueda del Gato de Fuego",
-    japaneseName: "火の猫の空中回転 (Aú Sem Mão)",
+    name: "Aú sem mão",
     category: SkillCategory.Capoeira,
     capacityType: PhysicalCapacityType.Agility,
     levelRequired: 3,
@@ -174,8 +164,7 @@ export const INITIAL_SKILLS: TrainingSkill[] = [
   },
   {
     id: "capo_macaco",
-    name: "Asalto del Mono de las Sombras",
-    japaneseName: "猿人のバックターン (Macaco Shadow Assault)",
+    name: "Macaco",
     category: SkillCategory.Capoeira,
     capacityType: PhysicalCapacityType.Balance,
     levelRequired: 4,
@@ -187,8 +176,7 @@ export const INITIAL_SKILLS: TrainingSkill[] = [
   },
   {
     id: "capo_envergado",
-    name: "Giro Súper Cósmico Ryuo",
-    japaneseName: "流桜・暴風回転 (Ryuo Strom Kick / Envergado)",
+    name: "Envergado",
     category: SkillCategory.Capoeira,
     capacityType: PhysicalCapacityType.Rhythm,
     levelRequired: 5,
@@ -200,26 +188,13 @@ export const INITIAL_SKILLS: TrainingSkill[] = [
   }
 ];
 
-export const INITIAL_LOGS: TrainingLogEntry[] = [
-  {
-    id: "log_1",
-    date: "2026-05-28",
-    activity: "Práctica de Ginga rítmica en la arena de Kuri",
-    category: SkillCategory.Capoeira,
-    repsOrMinutes: "15 min",
-    xpGained: 15,
-    capacityBoosted: PhysicalCapacityType.Rhythm
-  },
-  {
-    id: "log_2",
-    date: "2026-05-28",
-    activity: "Flexiones de Madera en barra baja rústica",
-    category: SkillCategory.Calisthenics,
-    repsOrMinutes: "3 series de 15 reps",
-    xpGained: 20,
-    capacityBoosted: PhysicalCapacityType.Strength
-  }
-];
+/**
+ * Empty on purpose. Two demo sessions dated 2026-05-28 used to ship here, which meant the app
+ * could never be taken to zero: wiping it restored the fakes, and two backups exported a day
+ * apart were byte-identical because the only entries in them were these. A training diary that
+ * starts with invented sessions cannot be trusted to tell the truth about the real ones.
+ */
+export const INITIAL_LOGS: TrainingLogEntry[] = [];
 
 export const INITIAL_QUESTS: MeritQuest[] = [
   {

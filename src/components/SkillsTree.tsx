@@ -107,10 +107,12 @@ export default function SkillsTree({
               <div>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className="text-[9px] text-wano-gold font-japanese font-semibold tracking-wider">
-                      {skill.japaneseName}
-                    </span>
-                    <h4 className="font-japanese text-base text-wano-parchment font-bold tracking-wide mt-0.5">
+                    {skill.japaneseName && (
+                      <span className="text-[9px] text-wano-gold font-japanese font-semibold tracking-wider">
+                        {skill.japaneseName}
+                      </span>
+                    )}
+                    <h4 className="font-japanese text-base text-wano-parchment font-bold tracking-wide">
                       {skill.name}
                     </h4>
                   </div>
