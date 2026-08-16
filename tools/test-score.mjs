@@ -24,15 +24,22 @@ const near = (name, got, want, tol = 1e-6) => {
   console.log(`${ok ? 'OK  ' : 'FALLA'}  ${name}${ok ? '' : ` — esperado ${want}, obtenido ${got}`}`);
 };
 
-console.log('== la escala es Hirajoshi en La ==');
+console.log('== la escala es el modo yo en La, el brillante ==');
 // Intervals in semitones from the root, computed from the frequencies actually used.
 const semis = S.SCALE_HZ.slice(0, 5).map((f) => Math.round(12 * Math.log2(f / S.SCALE_HZ[0])));
-check('intervalos 2-1-4-1-4', semis, [0, 2, 3, 7, 8]);
+check('intervalos 2-3-2-2-3 (A B D E F#)', semis, [0, 2, 5, 7, 9]);
 check('la octava se repite exacta', Math.round(12 * Math.log2(S.SCALE_HZ[5] / S.SCALE_HZ[0])), 12);
+// This is the assertion that actually matters, and the reason the scale changed on 2026-08-14.
+// A semitone step anywhere puts the scale back in the *in* family — the dark one — and Daniel's
+// verdict on that was "muy fea y da miedo". No semitones, no menace.
+const steps = S.SCALE_HZ.slice(1).map((f, i) => Math.round(12 * Math.log2(f / S.SCALE_HZ[i])));
+check('ningun paso de semitono en toda la escala', steps.filter((s) => s === 1).length, 0);
+check('todos los pasos son de 2 o 3 semitonos', [...new Set(steps)].sort(), [2, 3]);
 
 console.log('\n== el bucle y la rejilla ==');
 check('16 compases: 4 jo + 8 ha + 4 kyu', S.LOOP_BEATS, 64);
-near('dura 53,3 s a 72 bpm', S.LOOP_SEC, 64 * (60 / 72), 1e-9);
+check('96 bpm, no los 72 de marcha funebre', S.BPM, 96);
+near('dura 40 s', S.LOOP_SEC, 64 * (60 / 96), 1e-9);
 check('secciones en orden', S.SECTION_MAP.map((s) => `${s.name}@${s.startBeat}`), ['jo@0', 'ha@16', 'kyu@48']);
 check('ningun evento se sale del bucle', S.SCORE.filter((e) => e.beat < 0 || e.beat >= S.LOOP_BEATS).length, 0);
 check('todo cae en semicorcheas o mas largo', S.SCORE.filter((e) => Math.abs(e.beat * 4 - Math.round(e.beat * 4)) > 1e-9).length, 0);

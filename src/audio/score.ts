@@ -18,21 +18,29 @@
  */
 
 /**
- * Hirajoshi, the classical koto tuning, rooted on A: A B C E F.
- * Intervals 2-1-4-1-4 semitones, which is what gives it the sound Daniel asked for. Kept from the
- * previous version, where it was already correct.
+ * The yo scale (陽旋法), rooted on A: A B D E F#. Intervals 2-3-2-2-3, no semitones anywhere.
+ *
+ * This replaced Hirajoshi on 2026-08-14, and the reason is the whole point. Japanese traditional
+ * music has two families of scale: *in* (陰), dark, built on semitone steps, and *yo* (陽), bright,
+ * built without them. Hirajoshi is *in* — it is the sound of a ghost scene, and Daniel's verdict on
+ * it was "muy fea y da miedo". That was not a mistake in the arrangement; the scale was doing
+ * exactly what that scale does. The yo scale is the same tradition — it is what folk song and
+ * festival music use — without the menace.
+ *
+ * If a dark section is ever wanted deliberately, it belongs in one section, not in the loop a man
+ * hears every time he opens his training diary.
  */
 export const SCALE_HZ = [
   220.0, // 0  A3
   246.94, // 1  B3
-  261.63, // 2  C4
+  293.66, // 2  D4
   329.63, // 3  E4
-  349.23, // 4  F4
+  369.99, // 4  F#4
   440.0, // 5  A4
   493.88, // 6  B4
-  523.25, // 7  C5
+  587.33, // 7  D5
   659.25, // 8  E5
-  698.46, // 9  F5
+  739.99, // 9  F#5
 ];
 
 export type Voice = "shamisen" | "koto" | "flute" | "taiko" | "tsuzumi";
@@ -49,7 +57,9 @@ export interface Event {
   gain?: number;
 }
 
-export const BPM = 72;
+// 72 bpm was funeral pace. At 96 the same material reads as festival rather than dread — the other
+// half of the "da miedo" fix, along with the scale and the sound design in Soundtrack.tsx.
+export const BPM = 96;
 export const BEAT_SEC = 60 / BPM;
 const BAR = 4;
 

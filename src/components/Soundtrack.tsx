@@ -53,10 +53,15 @@ class WanoSynth {
     if (this.ctx.state === "suspended") void this.ctx.resume();
   }
 
-  /** A wooden hall, faked with a decaying-noise impulse response. */
+  /**
+   * A wooden room, faked with a decaying-noise impulse response.
+   * Shortened from 1.9 s to 0.8 s on 2026-08-14: a two-second tail on every note is a cavern, and a
+   * cavern is half of why this sounded like a horror soundtrack. A small room is what a shamisen
+   * played indoors actually sounds like.
+   */
   private buildReverb() {
     const ctx = this.ctx!;
-    const len = Math.floor(ctx.sampleRate * 1.9);
+    const len = Math.floor(ctx.sampleRate * 0.8);
     const buf = ctx.createBuffer(2, len, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
       const data = buf.getChannelData(ch);
@@ -65,7 +70,7 @@ class WanoSynth {
     this.reverb = ctx.createConvolver();
     this.reverb.buffer = buf;
     const wet = ctx.createGain();
-    wet.gain.value = 0.22;
+    wet.gain.value = 0.1;
     this.reverb.connect(wet);
     wet.connect(this.master!);
   }
@@ -184,44 +189,63 @@ class WanoSynth {
     this.send(pluckGain, 0.2);
   }
 
-  /** Shakuhachi-ish: a breathy sustained tone. Mostly filtered noise over a weak sine. */
+  /**
+   * A flute tone. Deliberately steadier and much less breathy than before.
+   * The old one drifted up 0.6% and back down over a two-and-a-half second note, over a bed of
+   * bandpassed noise — a wavering, airy, unsteady pitch, which is the single most reliable way to
+   * make anything sound haunted. It now holds its pitch, and the breath is a quarter of what it was.
+   */
   playFlute(freq: number, t: number, dur = 2.5, gain = 0.45) {
     const ctx = this.ctx!;
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, t);
-    env.gain.linearRampToValueAtTime(0.1 * gain, t + 0.28); // slow, breathy onset
-    env.gain.setValueAtTime(0.1 * gain, t + dur * 0.65);
+    env.gain.linearRampToValueAtTime(0.1 * gain, t + 0.1);
+    env.gain.setValueAtTime(0.1 * gain, t + dur * 0.7);
     env.gain.exponentialRampToValueAtTime(0.0008, t + dur);
 
     const osc = ctx.createOscillator();
     osc.type = "sine";
     osc.frequency.setValueAtTime(freq, t);
-    // A little unsteadiness in the pitch, or it sounds like a test tone.
-    osc.frequency.linearRampToValueAtTime(freq * 1.006, t + dur * 0.4);
-    osc.frequency.linearRampToValueAtTime(freq * 0.997, t + dur);
     osc.connect(env);
     osc.start(t);
     osc.stop(t + dur + 0.05);
 
-    const breath = this.noiseBurst(dur + 0.1);
+    // A soft octave above, which brightens the tone without the noise doing the work.
+    const shimmer = ctx.createOscillator();
+    const sg = ctx.createGain();
+    shimmer.type = "sine";
+    shimmer.frequency.value = freq * 2;
+    sg.gain.setValueAtTime(0, t);
+    sg.gain.linearRampToValueAtTime(0.025 * gain, t + 0.12);
+    sg.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+    shimmer.connect(sg);
+    shimmer.start(t);
+    shimmer.stop(t + dur + 0.05);
+
+    const breath = this.noiseBurst(0.16);
     const bp = ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.value = freq * 1.6;
-    bp.Q.value = 2.2;
+    bp.frequency.value = freq * 2.4;
+    bp.Q.value = 3;
     const bg = ctx.createGain();
-    bg.gain.setValueAtTime(0, t);
-    bg.gain.linearRampToValueAtTime(0.05 * gain, t + 0.3);
-    bg.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+    bg.gain.setValueAtTime(0.012 * gain, t);
+    bg.gain.exponentialRampToValueAtTime(0.0004, t + 0.16);
     breath.connect(bp);
     bp.connect(bg);
     breath.start(t);
-    breath.stop(t + dur + 0.1);
+    breath.stop(t + 0.17);
 
-    this.send(env, 0.7);
-    this.send(bg, 0.5);
+    this.send(env, 0.35);
+    this.send(sg, 0.35);
+    this.send(bg, 0.2);
   }
 
-  /** Taiko: low body plus a filtered membrane thud. */
+  /**
+   * Taiko: a struck drum, not a subwoofer.
+   * It used to sweep 72 Hz down to 28 and ring for half a second, which is the sound design of a
+   * trailer for something bad happening. A real taiko has a pitched, woody centre and stops. Raised
+   * to 130 → 70 Hz and cut to a third of the length on 2026-08-14.
+   */
   playTaiko(t?: number, gain = 1) {
     this.init();
     const ctx = this.ctx!;
@@ -230,28 +254,30 @@ class WanoSynth {
     const osc = ctx.createOscillator();
     const env = ctx.createGain();
     osc.type = "sine";
-    osc.frequency.setValueAtTime(72, t);
-    osc.frequency.exponentialRampToValueAtTime(28, t + 0.4);
-    env.gain.setValueAtTime(0.5 * gain, t);
-    env.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.frequency.setValueAtTime(130, t);
+    osc.frequency.exponentialRampToValueAtTime(70, t + 0.1);
+    env.gain.setValueAtTime(0.42 * gain, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
     osc.connect(env);
     osc.start(t);
-    osc.stop(t + 0.55);
+    osc.stop(t + 0.2);
 
-    const memb = this.noiseBurst(0.18);
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 170;
+    // The wooden crack of the stick, which is what makes it read as "struck" rather than "boomed".
+    const memb = this.noiseBurst(0.09);
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 900;
+    bp.Q.value = 0.8;
     const mg = ctx.createGain();
-    mg.gain.setValueAtTime(0.3 * gain, t);
-    mg.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-    memb.connect(lp);
-    lp.connect(mg);
+    mg.gain.setValueAtTime(0.16 * gain, t);
+    mg.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    memb.connect(bp);
+    bp.connect(mg);
     memb.start(t);
-    memb.stop(t + 0.2);
+    memb.stop(t + 0.1);
 
-    this.send(env, 0.35);
-    this.send(mg, 0.25);
+    this.send(env, 0.2);
+    this.send(mg, 0.15);
   }
 
   /** Tsuzumi: the small hand drum. Short, high, dry — it marks time where the taiko marks weight. */
