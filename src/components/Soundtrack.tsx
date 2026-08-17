@@ -27,13 +27,60 @@ import { BEAT_SEC, eventsInWindow, SCALE_HZ, type Voice } from "../audio/score";
 const LOOKAHEAD_SEC = 0.35; // how far ahead notes are handed to the audio clock
 const TICK_MS = 60; // how often the scheduler wakes up to top it up
 
+/**
+ * 0.05 s of silence: 8 kHz, mono, 8-bit PCM WAV. See claimPlaybackSession() for why a silent file
+ * is the thing that makes sound come out. Generated, not downloaded — 592 characters of base64.
+ */
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
+
 class WanoSynth {
   private ctx: AudioContext | null = null;
+  private silence: HTMLAudioElement | null = null;
   private reverb: ConvolverNode | null = null;
   private dry: GainNode | null = null;
   private master: GainNode | null = null;
 
+  /**
+   * Why the music was silent on his iPhone and not on the PC.
+   *
+   * iOS silences the **Web Audio API** whenever the ring/silent switch is on. `<audio>` and
+   * `<video>` elements are exempt; a synthesiser is not. There is no error, no console warning and
+   * no failed promise: the context reports `running`, the notes are scheduled, and nothing comes
+   * out. A desktop browser has no such switch, so the same build sounds fine there.
+   *
+   * Two routes, both attempted, cheapest first:
+   *
+   * 1. `navigator.audioSession.type = "playback"` — the standard route, and the one Apple added for
+   *    exactly this. Safari-only and still experimental (shipped behind a flag in 16.4), so it
+   *    cannot be relied on alone.
+   * 2. Playing a silent `<audio>` element. An element that is playing moves the page to a playback
+   *    audio session, and the synth then rides along in it. It has to start inside the same user
+   *    gesture as the AudioContext, which is why this is called from init() and init() is called
+   *    from the button's onClick.
+   *
+   * Both are best-effort and both fail quietly: if neither works, the button behaves as it did
+   * before and the phone stays silent while muted.
+   */
+  private claimPlaybackSession() {
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    if (session) {
+      try {
+        session.type = "playback";
+      } catch {
+        // Older WebKit: the property exists but the value is rejected. Route 2 still applies.
+      }
+    }
+    if (!this.silence) {
+      this.silence = new Audio(SILENT_WAV);
+      this.silence.loop = true;
+    }
+    // Rejects when there was no gesture; that is not worth an error, the music simply stays muted.
+    void this.silence.play().catch(() => {});
+  }
+
   init() {
+    this.claimPlaybackSession();
     if (this.ctx) {
       // Safari suspends the context when the page is backgrounded and does not resume it on its
       // own. Without this, everything below schedules into a clock that is not advancing, which
@@ -363,6 +410,9 @@ class WanoSynth {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    // Silence stops with the music: a looping element left running holds an audio session open,
+    // and iOS then shows the app in the lock screen and Control Centre as if it were a player.
+    this.silence?.pause();
   }
 }
 
