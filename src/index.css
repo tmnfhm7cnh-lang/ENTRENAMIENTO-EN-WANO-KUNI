@@ -35,6 +35,34 @@ body {
   overflow-x: hidden;
 }
 
+/**
+ * The notch, the clock and the front camera.
+ *
+ * index.html declares `viewport-fit=cover` and `apple-mobile-web-app-status-bar-style:
+ * black-translucent`, which together mean the page starts at the physical top edge of the screen,
+ * not below the status bar. On his iPhone that put the crest and the XP bar underneath the clock
+ * and the camera cutout. `env(safe-area-inset-*)` is the strip iOS reserves; on any screen without
+ * a cutout — the PC, an older iPad — it is 0px and nothing moves.
+ *
+ * It goes on the header rather than on the app container so the header's own gradient fills the
+ * strip instead of leaving a bare band of page background above it.
+ */
+.safe-top {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+}
+
+@media (min-width: 768px) {
+  .safe-top {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
+  }
+}
+
+/* Landscape on a notched phone eats a strip on one side too. */
+#wano-dashboard-app {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
 /* Japanese Ink wash borders and brush shadows */
 .brush-border-crimson {
   position: relative;

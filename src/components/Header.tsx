@@ -15,7 +15,7 @@ export default function Header({ character }: HeaderProps) {
   const xpPercent = Math.min(100, Math.floor((character.xp / character.xpNeeded) * 100));
 
   return (
-    <header className="relative w-full py-6 md:py-8 px-4 border-b border-wano-gold/20 overflow-hidden bg-gradient-to-b from-wano-ink to-black">
+    <header className="safe-top relative w-full pb-6 md:pb-8 px-4 border-b border-wano-gold/20 overflow-hidden bg-gradient-to-b from-wano-ink to-black">
       {/* Decorative Wano Red Sun Overlay */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 md:w-80 md:h-80 bg-wano-crimson/5 rounded-full blur-2xl pointer-events-none" />
       

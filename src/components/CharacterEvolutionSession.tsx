@@ -47,10 +47,6 @@ export default function CharacterEvolutionSession({
 
   const currentAvatar = character.avatarUrl;
 
-  const formattedPhaseName = character.phaseName
-    .replace(/shogun/gi, "maestro")
-    .replace(/iniciante/gi, "batizado")
-    .replace(/Shogunado/gi, "Dojo del Maestro");
 
   // This panel always stacks. It used to be `lg:flex-row`, which reads the
   // VIEWPORT width — but the panel lives inside the 4-of-12 left column, so at
@@ -66,12 +62,13 @@ export default function CharacterEvolutionSession({
       {/* Core Avatar Frame with Scenario Background and Momonosuke Colors */}
       <div className="flex flex-col items-center justify-between gap-4 py-4 pb-6 border-b border-wano-gold/10">
         
-        {/* Canvas / Scene Header */}
+        {/* Canvas / Scene Header.
+            The "REGIMIENTO DE AVATAR: Camino del Maestro: Batizado" badge was removed on
+            2026-08-17 at Daniel's request: on a phone the line wrapped into two boxes, and he
+            could not tell what it meant. Nothing is lost — the same rank is already on screen,
+            spelled out under the name and again on the corda. */}
         <div className="text-center w-full">
-          <span className="font-japanese text-[10px] tracking-widest text-wano-gold bg-wano-crimson/30 px-2.5 py-0.5 border border-wano-gold/30 rounded uppercase">
-            REGIMIENTO DE AVATAR: {formattedPhaseName}
-          </span>
-          <h2 className="font-japanese text-2xl text-wano-parchment font-bold mt-1 tracking-wider uppercase">
+          <h2 className="font-japanese text-2xl text-wano-parchment font-bold tracking-wider uppercase">
             {character.name}
           </h2>
           <p className="text-xs text-wano-gold/80 italic font-medium">「 {character.title} 」</p>
