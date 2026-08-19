@@ -35,6 +35,14 @@ export interface SessionEntry {
   id: string;
   /** YYYY-MM-DD. */
   date: string;
+  /**
+   * The two columns sesiones.csv has had since before this app: which training block this
+   * belongs to, and which session of the week it was. Optional here because nothing in the
+   * scoring reads them — they exist so the export writes the file the system already speaks,
+   * rather than a shape of the app's own invention.
+   */
+  bloque?: string;
+  sesion?: string;
   sets: LoggedSet[];
   notes?: string;
 }

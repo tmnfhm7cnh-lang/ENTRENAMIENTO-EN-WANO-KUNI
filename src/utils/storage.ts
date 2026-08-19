@@ -19,6 +19,8 @@ import {
   TrainingLogEntry,
   MeritQuest,
 } from "../types";
+import type { SessionEntry } from "../game/derive";
+import type { PlanData } from "../data/plan";
 
 const STORAGE_KEY = "wano-kuni:state";
 
@@ -27,23 +29,47 @@ const STORAGE_KEY = "wano-kuni:state";
  * satisfy. `loadState` refuses to read a record it does not understand rather
  * than feeding half-migrated data into the app.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export interface PersistedState {
   schemaVersion: number;
   savedAt: string;
   character: SamuraiCharacter;
   skills: TrainingSkill[];
+  /**
+   * The old free-text log. Version 2 stopped writing to it and nothing reads it for the
+   * character any more, but it is kept, untouched, because it is the only copy of whatever he
+   * typed before — and a migration that quietly drops a training log is not a migration.
+   */
   logs: TrainingLogEntry[];
   quests: MeritQuest[];
   availablePoints: number;
   activeScenarioId: string;
+  /** The real log since version 2: sessions made of sets. This is what the character derives from. */
+  sessions: SessionEntry[];
+  /** His written block, imported. Null until he loads it. */
+  plan: PlanData | null;
 }
 
 export type LoadResult =
   | { status: "ok"; state: PersistedState }
   | { status: "empty" }
   | { status: "unreadable"; reason: string };
+
+/**
+ * Version 1 records become version 2 by gaining two empty fields. Nothing is read differently and
+ * nothing is discarded, so this can never lose data: it is the whole reason loadState migrates
+ * instead of refusing, which is what it did before and would have wiped his phone.
+ */
+function migrate(state: PersistedState): PersistedState {
+  if (state.schemaVersion === SCHEMA_VERSION) return state;
+  return {
+    ...state,
+    schemaVersion: SCHEMA_VERSION,
+    sessions: Array.isArray(state.sessions) ? state.sessions : [],
+    plan: state.plan ?? null,
+  };
+}
 
 function isPlausibleState(value: unknown): value is PersistedState {
   if (typeof value !== "object" || value === null) return false;
@@ -80,14 +106,14 @@ export function loadState(): LoadResult {
     return { status: "unreadable", reason: "el registro guardado no tiene la forma esperada" };
   }
 
-  if (parsed.schemaVersion !== SCHEMA_VERSION) {
+  if (parsed.schemaVersion > SCHEMA_VERSION) {
     return {
       status: "unreadable",
       reason: `el registro es de la versión ${parsed.schemaVersion} y esta app usa la ${SCHEMA_VERSION}`,
     };
   }
 
-  return { status: "ok", state: parsed };
+  return { status: "ok", state: migrate(parsed) };
 }
 
 export function saveState(state: Omit<PersistedState, "schemaVersion" | "savedAt">): boolean {
@@ -186,12 +212,12 @@ export async function importBackup(file: File): Promise<LoadResult> {
     return { status: "unreadable", reason: "el archivo no es una copia de Wano Kuni" };
   }
 
-  if (parsed.schemaVersion !== SCHEMA_VERSION) {
+  if (parsed.schemaVersion > SCHEMA_VERSION) {
     return {
       status: "unreadable",
       reason: `la copia es de la versión ${parsed.schemaVersion} y esta app usa la ${SCHEMA_VERSION}`,
     };
   }
 
-  return { status: "ok", state: parsed };
+  return { status: "ok", state: migrate(parsed) };
 }

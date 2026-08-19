@@ -23,7 +23,13 @@ export type Metric =
   | "duration" // tiempo_s, continuous work
   | "distance"; // distancia, in the notes column for now
 
-export type Discipline = "calistenia" | "capoeira" | "gimnasio" | "atletismo" | "acondicionamiento";
+export type Discipline =
+  | "calistenia"
+  | "capoeira"
+  | "gimnasio"
+  | "atletismo"
+  | "acondicionamiento"
+  | "movilidad";
 
 /**
  * Which attribute a set feeds. Deliberately the same four the character sheet shows, so the link
@@ -79,6 +85,49 @@ export const EXERCISES: Exercise[] = [
   { id: "au-sem-mao", name: "Aú sem mão", discipline: "capoeira", metric: "reps", capacity: "agility", skillId: "capo_au" },
   { id: "macaco", name: "Macaco", discipline: "capoeira", metric: "reps", capacity: "balance", skillId: "capo_macaco" },
   { id: "envergado", name: "Envergado", discipline: "capoeira", metric: "reps", capacity: "rhythm", skillId: "capo_envergado" },
+  { id: "pateos", name: "Pateos", discipline: "capoeira", metric: "reps", capacity: "agility" },
+  { id: "queda", name: "Queda con compañero", discipline: "capoeira", metric: "reps", capacity: "agility" },
+  { id: "jogo", name: "Jogo — guion completo", discipline: "capoeira", metric: "duration", capacity: "rhythm" },
+
+  // --- The rest of his written block, added on 2026-08-19 when the plan became the app's input.
+  //     Until then the catalogue held 28 movements while the plan asks for these too, and a set of
+  //     an exercise the catalogue does not know scores zero — so the hole was his real training not
+  //     counting. Ids follow the same rule as the rest: they are what goes into the CSV. ---
+  { id: "hspu", name: "HSPU / fondos en pino", discipline: "calistenia", metric: "reps", capacity: "strength" },
+  { id: "pino-pared", name: "Pino en pared", discipline: "calistenia", metric: "hold", capacity: "balance" },
+  { id: "dominada-lastrada", name: "Dominada lastrada", discipline: "calistenia", metric: "load", capacity: "strength" },
+  { id: "deadhang", name: "Deadhang", discipline: "calistenia", metric: "hold", capacity: "strength" },
+  { id: "skin-the-cat", name: "Skin the cat", discipline: "calistenia", metric: "reps", capacity: "strength" },
+  { id: "elevacion-escapular", name: "Elevación escapular", discipline: "calistenia", metric: "reps", capacity: "strength", accessory: true },
+  { id: "preparacion-codo", name: "Preparación de codo y escápula", discipline: "calistenia", metric: "reps", capacity: "strength", accessory: true },
+  { id: "extension-lumbar", name: "Extensión lumbar", discipline: "gimnasio", metric: "reps", capacity: "strength" },
+  { id: "extension-lumbar-iso", name: "Extensión lumbar isométrica", discipline: "gimnasio", metric: "hold", capacity: "strength" },
+  { id: "sentadilla-una-pierna", name: "Sentadilla a una pierna", discipline: "gimnasio", metric: "load", capacity: "strength" },
+  { id: "copenhagen", name: "Copenhagen", discipline: "gimnasio", metric: "hold", capacity: "strength" },
+  { id: "pallof-press", name: "Pallof press", discipline: "gimnasio", metric: "hold", capacity: "balance", accessory: true },
+  { id: "plancha-lateral", name: "Plancha lateral", discipline: "gimnasio", metric: "hold", capacity: "balance", accessory: true },
+  { id: "bird-dog", name: "Bird dog", discipline: "gimnasio", metric: "reps", capacity: "balance", accessory: true },
+  { id: "zona-2", name: "Zona 2", discipline: "acondicionamiento", metric: "duration", capacity: "rhythm" },
+  { id: "intervalos", name: "Intervalos", discipline: "acondicionamiento", metric: "duration", capacity: "rhythm" },
+  { id: "trampolines", name: "Trampolines", discipline: "acondicionamiento", metric: "duration", capacity: "agility" },
+
+  // --- Mobility. It is a whole strand of his week — the daily block runs seven days — and it had
+  //     no home in the catalogue at all. ---
+  { id: "bloque-diario", name: "Bloque diario completo", discipline: "movilidad", metric: "duration", capacity: "balance" },
+  { id: "movilidad-hombro", name: "Movilidad de hombro y espalda", discipline: "movilidad", metric: "duration", capacity: "agility" },
+  { id: "movilidad-cadera", name: "Movilidad de cadera", discipline: "movilidad", metric: "duration", capacity: "agility" },
+  { id: "movilidad-munecas", name: "Movilidad de muñecas", discipline: "movilidad", metric: "reps", capacity: "agility" },
+  { id: "dislocaciones", name: "Dislocaciones con pica", discipline: "movilidad", metric: "reps", capacity: "agility" },
+  { id: "sentadilla-profunda", name: "Sentadilla profunda", discipline: "movilidad", metric: "hold", capacity: "agility" },
+  { id: "lunge-rotacion", name: "Lunge con rotación", discipline: "movilidad", metric: "reps", capacity: "agility" },
+  { id: "elephant-walk", name: "Elephant walk", discipline: "movilidad", metric: "reps", capacity: "agility" },
+  { id: "cobra", name: "Cobra", discipline: "movilidad", metric: "reps", capacity: "agility" },
+  { id: "ponte", name: "Ponte", discipline: "movilidad", metric: "hold", capacity: "agility" },
+  { id: "cat-camel", name: "Cat-camel", discipline: "movilidad", metric: "reps", capacity: "agility" },
+  { id: "pigeon", name: "Pigeon activo", discipline: "movilidad", metric: "hold", capacity: "agility" },
+  { id: "frog", name: "Frog activo", discipline: "movilidad", metric: "hold", capacity: "agility" },
+  { id: "pancake", name: "Pancake", discipline: "movilidad", metric: "hold", capacity: "agility" },
+  { id: "spagat", name: "Abertura lateral (spagat)", discipline: "movilidad", metric: "hold", capacity: "agility" },
 ];
 
 export const EXERCISE_BY_ID: Record<string, Exercise> = Object.fromEntries(
@@ -91,6 +140,7 @@ export const DISCIPLINES: { id: Discipline; label: string }[] = [
   { id: "gimnasio", label: "Gimnasio" },
   { id: "atletismo", label: "Atletismo" },
   { id: "acondicionamiento", label: "Acondicionamiento" },
+  { id: "movilidad", label: "Movilidad" },
 ];
 
 /** Exercises of a discipline, goals before accessories, so the list opens on what matters. */

@@ -7,6 +7,8 @@ import {
   MeritQuest,
 } from "../types";
 import { exportBackup, importBackup, clearState } from "../utils/storage";
+import type { SessionEntry } from "../game/derive";
+import type { PlanData } from "../data/plan";
 
 export interface BackupState {
   character: SamuraiCharacter;
@@ -15,6 +17,9 @@ export interface BackupState {
   quests: MeritQuest[];
   availablePoints: number;
   activeScenarioId: string;
+  /** The real log, since the app started keeping sets rather than sentences. */
+  sessions: SessionEntry[];
+  plan: PlanData | null;
 }
 
 interface BackupPanelProps {
@@ -46,8 +51,10 @@ export default function BackupPanel({ state, onRestore, onReset }: BackupPanelPr
         quests: s.quests,
         availablePoints: s.availablePoints,
         activeScenarioId: s.activeScenarioId,
+        sessions: s.sessions ?? [],
+        plan: s.plan ?? null,
       });
-      setMessage(`Copia del ${s.savedAt.split("T")[0]} restaurada: ${s.logs.length} sesiones.`);
+      setMessage(`Copia del ${s.savedAt.split("T")[0]} restaurada: ${(s.sessions ?? []).length} sesiones.`);
     } else {
       setMessage(
         result.status === "unreadable"

@@ -31,7 +31,21 @@ import MeritQuests from "./components/MeritQuests";
 import BackupPanel from "./components/BackupPanel";
 import WanoMapLore, { SCENARIOS } from "./components/WanoMapLore";
 import { synthManager } from "./components/Soundtrack";
-import { MapPin, Sparkles, BookOpen, Clock } from "lucide-react";
+import TodayScreen from "./components/TodayScreen";
+import { deriveCharacter, type SessionEntry } from "./game/derive";
+import { todayISO, type PlanData } from "./data/plan";
+import { readDataFile, mergeSessions } from "./utils/datafile";
+import { exportCsv } from "./utils/csv";
+import { MapPin, Sparkles, BookOpen, Clock, Upload, FileDown, CalendarCheck } from "lucide-react";
+
+/**
+ * His corda, as a fact rather than a consequence of the game.
+ *
+ * The inherited code deduced it from the game level, which is how the app came to tell him he
+ * was Amarela/Laranja when he has been Cinza since the batizado of 2026-05-22. A real belt is
+ * given by a mestre once a year; nothing that happens in here can grant one.
+ */
+const CORDA = { name: "Cinza", colors: ["#9ca3af"] };
 
 // Read localStorage once, before the first render, so the app never flashes the
 // starting character over saved data.
@@ -46,8 +60,11 @@ export default function App() {
   const [quests, setQuests] = useState<MeritQuest[]>(restored?.quests ?? INITIAL_QUESTS);
   const [activeScenarioId, setActiveScenarioId] = useState(restored?.activeScenarioId ?? "scen_kuri");
 
+  const [sessions, setSessions] = useState<SessionEntry[]>(restored?.sessions ?? []);
+  const [plan, setPlan] = useState<PlanData | null>(restored?.plan ?? null);
+
   const [availablePoints, setAvailablePoints] = useState(restored?.availablePoints ?? 0);
-  const [currentTab, setCurrentTab] = useState<"skills" | "logger" | "quests" | "scenarios">("skills");
+  const [currentTab, setCurrentTab] = useState<"hoy" | "skills" | "logger" | "quests" | "scenarios">("hoy");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTimer, setToastTimer] = useState<any>(null);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -63,9 +80,40 @@ export default function App() {
       // skip it when we restored nothing, so a fresh install gets a record.
       if (restored) return;
     }
-    const ok = saveState({ character, skills, logs, quests, availablePoints, activeScenarioId });
+    const ok = saveState({
+      character,
+      skills,
+      logs,
+      quests,
+      availablePoints,
+      activeScenarioId,
+      sessions,
+      plan,
+    });
     setSaveFailed(!ok);
-  }, [character, skills, logs, quests, availablePoints, activeScenarioId, restored]);
+  }, [character, skills, logs, quests, availablePoints, activeScenarioId, sessions, plan, restored]);
+
+  /* ------------------------------------------------- the character, derived */
+
+  // Nothing below is stored. XP, level, rank and the four attributes are a pure function of the
+  // sets logged, recomputed on every render — game/derive.ts, and the decision of 2026-08-16.
+  const today = todayISO();
+  const derived = deriveCharacter(sessions, today);
+  const shown: SamuraiCharacter = {
+    ...character,
+    level: derived.rank.level,
+    xp: derived.rank.xpInto,
+    xpNeeded: derived.rank.xpForNext,
+    cordaName: CORDA.name,
+    cordaColors: CORDA.colors,
+    stats: {
+      ...character.stats,
+      strength: derived.stats.strength,
+      agility: derived.stats.agility,
+      balance: derived.stats.balance,
+      rhythm: derived.stats.rhythm,
+    },
+  };
 
   const handleRestoreBackup = (state: {
     character: SamuraiCharacter;
@@ -89,9 +137,45 @@ export default function App() {
     setSkills(INITIAL_SKILLS);
     setLogs(INITIAL_LOGS);
     setQuests(INITIAL_QUESTS);
+    setSessions([]);
     setAvailablePoints(0);
     setActiveScenarioId("scen_kuri");
-    triggerToast("Diario vaciado. Empiezas de cero.");
+    // The plan is not the diary: emptying the log must not make him import it again.
+    triggerToast("Diario vaciado. La programación se queda cargada.");
+  };
+
+  /* ----------------------------------------------- the plan, and the export */
+
+  const planInput = useRef<HTMLInputElement>(null);
+
+  const handleDataFile = async (file: File | undefined) => {
+    if (!file) return;
+    const result = await readDataFile(file);
+    if (result.status === "error") {
+      triggerToast(`No se ha podido cargar: ${result.reason}`);
+      return;
+    }
+    setPlan(result.data.plan);
+    const before = sessions.length;
+    const merged = mergeSessions(sessions, result.data.history);
+    setSessions(merged);
+    triggerToast(
+      `Programación cargada: ${result.data.plan.weeks.length} semanas. ` +
+        `${merged.length - before} sesiones del histórico.`,
+    );
+  };
+
+  const handleExportCsv = async () => {
+    if (!sessions.length) {
+      triggerToast("Todavía no hay ninguna serie apuntada.");
+      return;
+    }
+    const route = await exportCsv(sessions, today);
+    triggerToast(
+      route === "share"
+        ? "Elige OneDrive en la hoja de compartir y déjalo en registro/."
+        : "Descargado. Búscalo en Archivos y muévelo a registro/.",
+    );
   };
 
   // Trigger automated alerts/toasts
@@ -350,7 +434,7 @@ export default function App() {
       <SakuraEffect />
 
       {/* Primary Header Banner */}
-      <Header character={character} />
+      <Header character={shown} />
 
       {/* Warn once if the browser refused to persist. Silence here would mean
           losing a whole session's log without ever saying so. */}
@@ -389,7 +473,7 @@ export default function App() {
         {/* Left Column (Character, Level Up and stats) - Col Span 4 */}
         <section className="lg:col-span-4 flex flex-col gap-6" id="samurai-details-column">
           <CharacterEvolutionSession
-            character={character}
+            character={shown}
             availablePoints={availablePoints}
             onAllocatePoint={handleAllocatePoint}
           />
@@ -435,8 +519,46 @@ export default function App() {
             </div>
           </div>
 
+          {/* The plan comes in as a file and the log goes out as the .csv the system already
+              had. Neither belongs in the JSON backup: one is written outside the app, the other
+              is what the rest of his system reads. */}
+          <div className="bg-[#100c0c] p-4 border border-wano-gold/15 rounded-xl flex flex-col gap-2">
+            <h4 className="font-japanese text-xs tracking-wider text-wano-gold uppercase font-bold border-b border-[#2d2525] pb-1.5 flex items-center gap-1">
+              <CalendarCheck className="w-3.5 h-3.5 text-wano-crimson" /> Programación y registro
+            </h4>
+            <input
+              ref={planInput}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                handleDataFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <button
+              onClick={() => planInput.current?.click()}
+              className="flex items-center gap-2 justify-center py-2.5 rounded border border-wano-gold/25 text-[11px] font-japanese uppercase tracking-wider text-wano-parchment hover:bg-wano-crimson/20 cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5 text-wano-gold" />
+              {plan ? "Actualizar programación" : "Cargar programación"}
+            </button>
+            <button
+              onClick={handleExportCsv}
+              className="flex items-center gap-2 justify-center py-2.5 rounded border border-wano-gold/25 text-[11px] font-japanese uppercase tracking-wider text-wano-parchment hover:bg-wano-crimson/20 cursor-pointer"
+            >
+              <FileDown className="w-3.5 h-3.5 text-wano-gold" />
+              Exportar sesiones .csv
+            </button>
+            <p className="text-[10px] text-[#8d8071] leading-relaxed">
+              {plan
+                ? `${plan.weeks.length} semanas cargadas · ${sessions.length} sesiones apuntadas`
+                : "Sin programación cargada. El registro funciona igual, eligiendo el ejercicio a mano."}
+            </p>
+          </div>
+
           <BackupPanel
-            state={{ character, skills, logs, quests, availablePoints, activeScenarioId }}
+            state={{ character, skills, logs, quests, availablePoints, activeScenarioId, sessions, plan }}
             onRestore={handleRestoreBackup}
             onReset={handleResetAll}
           />
@@ -448,6 +570,18 @@ export default function App() {
           {/* Ancient Scroll style Tab Bar Navigation */}
           <div className="flex flex-wrap bg-[#141010] p-1 border border-[#302525] rounded-lg">
             
+            <button
+              id="tab-btn-hoy"
+              onClick={() => setCurrentTab("hoy")}
+              className={`flex-1 min-w-[100px] text-center py-2.5 font-japanese text-[11px] font-extrabold tracking-widest uppercase transition-all rounded cursor-pointer ${
+                currentTab === "hoy"
+                  ? "bg-wano-crimson text-wano-parchment border border-wano-gold/30 shadow-md font-black"
+                  : "text-[#ccc2ac] hover:bg-zinc-900"
+              }`}
+            >
+              Hoy
+            </button>
+
             <button
               id="tab-btn-skills"
               onClick={() => setCurrentTab("skills")}
@@ -501,6 +635,16 @@ export default function App() {
           {/* Render Active Tab Screen with motion transitions simulated by fluid class states */}
           <div className="relative w-full" id="tab-content-render-target">
             
+            {currentTab === "hoy" && (
+              <TodayScreen
+                plan={plan}
+                sessions={sessions}
+                onSessions={setSessions}
+                onImport={() => planInput.current?.click()}
+                today={today}
+              />
+            )}
+
             {currentTab === "skills" && (
               <SkillsTree
                 skills={skills}
