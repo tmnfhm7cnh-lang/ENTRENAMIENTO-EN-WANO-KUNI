@@ -11,7 +11,7 @@
  * bit dryland-test-logger.
  */
 
-const CACHE = "wano-kuni-v7";
+const CACHE = "wano-kuni-v8";
 
 self.addEventListener("install", (event) => {
   // Take over as soon as the new worker is ready instead of waiting for every

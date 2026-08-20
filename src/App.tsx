@@ -171,10 +171,13 @@ export default function App() {
       return;
     }
     const route = await exportCsv(sessions, today);
+    // Not registro/. The Numbers notebook is the register of record and this app is the candidate
+    // trying to earn its place (decision of 2026-08-20); telling him to drop this next to the real
+    // sesiones.csv is telling him to keep two registers. It goes to copias-wano/, like the JSON.
     triggerToast(
       route === "share"
-        ? "Elige OneDrive en la hoja de compartir y déjalo en registro/."
-        : "Descargado. Búscalo en Archivos y muévelo a registro/.",
+        ? "Déjalo en registro/copias-wano/ — no sustituye al cuaderno."
+        : "Descargado. Muévelo a registro/copias-wano/, no a registro/.",
     );
   };
 
@@ -519,9 +522,14 @@ export default function App() {
             </div>
           </div>
 
-          {/* The plan comes in as a file and the log goes out as the .csv the system already
-              had. Neither belongs in the JSON backup: one is written outside the app, the other
-              is what the rest of his system reads. */}
+          {/* The plan comes in as a file and the log goes out as the .csv the system already had.
+              Neither belongs in the JSON backup: one is written outside the app, the other is a
+              copy meant to be compared against the register.
+
+              It is a copy and not the register: his Numbers notebook holds the truth and this app
+              is on trial (decision of 2026-08-20). So the export lands in registro/copias-wano/,
+              never on top of registro/sesiones.csv, and the panel says so rather than leaving him
+              to remember which of the two files matters. */}
           <div className="bg-[#100c0c] p-4 border border-wano-gold/15 rounded-xl flex flex-col gap-2">
             <h4 className="font-japanese text-xs tracking-wider text-wano-gold uppercase font-bold border-b border-[#2d2525] pb-1.5 flex items-center gap-1">
               <CalendarCheck className="w-3.5 h-3.5 text-wano-crimson" /> Programación y registro
@@ -554,6 +562,11 @@ export default function App() {
               {plan
                 ? `${plan.weeks.length} semanas cargadas · ${sessions.length} sesiones apuntadas`
                 : "Sin programación cargada. El registro funciona igual, eligiendo el ejercicio a mano."}
+            </p>
+            <p className="text-[10px] text-[#8d8071] leading-relaxed border-t border-[#2d2525] pt-2">
+              El registro de verdad es tu cuaderno de Numbers. Lo que sale de aquí es una{" "}
+              <strong className="text-wano-parchment">copia para comparar</strong>, y va a{" "}
+              <span className="font-mono text-[9px]">registro/copias-wano/</span>.
             </p>
           </div>
 

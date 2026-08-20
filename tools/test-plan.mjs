@@ -107,8 +107,11 @@ section("el .csv que sale es el que el sistema ya tenia");
 const dir = process.argv[2];
 const sesionesCsv = process.argv[3];
 
-if (!dir) {
-  console.log("\n....  sin comprobar contra las 19 semanas: pasa la carpeta como argumento");
+// Both arguments, not one: the hint used to name only the folder, and running it that way passes
+// `undefined` down to the generator, which dies reading a history file called "undefined".
+if (!dir || !sesionesCsv) {
+  console.log("\n....  sin comprobar contra las 19 semanas. Uso:");
+  console.log("      node tools/test-plan.mjs <carpeta-semanas> <sesiones.csv>");
 } else {
   section("las diecinueve semanas de verdad");
   const files = readdirSync(dir).filter((f) => f.endsWith(".csv")).sort();

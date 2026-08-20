@@ -310,7 +310,10 @@ function readHistory(file) {
     const sesion = clean(row[idx.sesion]) || "libre";
     const key = `${date}|${bloque}|${sesion}`;
     if (!bySession.has(key)) {
-      bySession.set(key, { id: `csv-${key}`, date, bloque, sesion, sets: [], notes: "" });
+      // The id IS the key: `date|bloque|sesion`, the same shape TodayScreen builds when he taps a
+      // set. It carried a `csv-` prefix until 2026-08-20, which made one session arrive twice —
+      // once tapped, once generated — and score twice. See sessionKey() in src/utils/datafile.ts.
+      bySession.set(key, { id: key, date, bloque, sesion, sets: [], notes: "" });
     }
     const entry = bySession.get(key);
     // `series` in the CSV counts identical sets; the app stores them one by one, which is what
